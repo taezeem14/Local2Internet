@@ -1,12 +1,13 @@
 # =========================================
-# Local2Internet v4 - Windows Edition
+# Local2Internet v4.1 - Advanced Windows Edition
 # Author: KasRoudra + Muhammad Taezeem Tariq Matta
-# GitHub: https://github.com/KasRoudra/Local2Internet
-# Description: Expose localhost to internet with triple tunneling
+# GitHub: https://github.com/Taezeem14/Local2Internet
+# Description: Expose localhost to internet with advanced features
 # License: MIT
 # =========================================
 
-# Requires -RunAsAdministrator for some operations
+#Requires -Version 5.1
+
 $ErrorActionPreference = "SilentlyContinue"
 
 # ---------------------------
@@ -16,10 +17,12 @@ $script:HOME = $env:USERPROFILE
 $script:BASE_DIR = "$HOME\.local2internet"
 $script:BIN_DIR = "$BASE_DIR\bin"
 $script:LOG_DIR = "$BASE_DIR\logs"
+$script:CONFIG_FILE = "$BASE_DIR\config.json"
 $script:DEFAULT_PORT = 8888
+$script:VERSION = "4.1"
 
 # ---------------------------
-# Colors & Formatting
+# Colors & Formatting (ANSI)
 # ---------------------------
 $ESC = [char]27
 $C = @{
@@ -46,7 +49,7 @@ $($C.Red)
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀
 $($C.Yellow)▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░
 $($C.Green)▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-$($C.Blue)                                      [v4 Windows Enhanced]
+$($C.Blue)                                      [v$VERSION Advanced - API Support]
 $($C.Reset)
 "@
 
@@ -71,6 +74,41 @@ function Stop-AllProcesses {
     if ($script:LoclxProcess) { Stop-Process -Id $script:LoclxProcess.Id -Force -ErrorAction SilentlyContinue }
     
     Start-Sleep -Seconds 1
+}
+
+# ---------------------------
+# Configuration Manager
+# ---------------------------
+function Get-Config {
+    if (Test-Path $CONFIG_FILE) {
+        try {
+            return Get-Content $CONFIG_FILE -Raw | ConvertFrom-Json
+        } catch {
+            return @{}
+        }
+    }
+    return @{}
+}
+
+function Save-Config($config) {
+    $config | ConvertTo-Json | Set-Content $CONFIG_FILE
+}
+
+function Get-ConfigValue($key) {
+    $config = Get-Config
+    return $config.$key
+}
+
+function Set-ConfigValue($key, $value) {
+    $config = Get-Config
+    $config | Add-Member -MemberType NoteProperty -Name $key -Value $value -Force
+    Save-Config $config
+}
+
+function Remove-ConfigValue($key) {
+    $config = Get-Config
+    $config.PSObject.Properties.Remove($key)
+    Save-Config $config
 }
 
 # ---------------------------
@@ -106,7 +144,7 @@ function Install-Dependencies {
         if (-not (Test-CommandExists $dep)) {
             if ($chocoInstalled) {
                 Write-Info "Installing $dep via Chocolatey..."
-                choco install $deps[$dep] -y --force
+                choco install $deps[$dep] -y --force | Out-Null
             } else {
                 Write-ErrorMsg "Missing dependency: $dep"
                 Write-ErrorMsg "Please install Chocolatey: https://chocolatey.org/install"
@@ -118,9 +156,10 @@ function Install-Dependencies {
     # Install http-server via npm
     if (Test-CommandExists "npm") {
         $httpServer = npm list -g http-server 2>$null | Select-String "http-server"
+        
         if (-not $httpServer) {
             Write-Info "Installing http-server..."
-            npm install -g http-server
+            npm install -g http-server | Out-Null
         }
     }
 }
@@ -136,7 +175,7 @@ function Get-SystemArchitecture {
     } elseif ($arch -eq 32) {
         return "386"
     } else {
-        return "amd64"  # Default fallback
+        return "amd64"
     }
 }
 
@@ -222,6 +261,127 @@ function Install-Tools {
 }
 
 # ---------------------------
+# API Key Management
+# ---------------------------
+function Manage-APIKeys {
+    while ($true) {
+        Clear-Host
+        Write-Host $LOGO
+        Write-Host ""
+        Write-Host "$($C.Yellow)╔════════════════════════════════════════╗$($C.Reset)"
+        Write-Host "$($C.Yellow)║         API KEY MANAGEMENT             ║$($C.Reset)"
+        Write-Host "$($C.Yellow)╚════════════════════════════════════════╝$($C.Reset)"
+        Write-Host ""
+        Write-Host "1) Set Ngrok Authtoken"
+        Write-Host "2) Set Loclx Access Token"
+        Write-Host "3) View Current Keys"
+        Write-Host "4) Remove Keys"
+        Write-Host "0) Back to Main Menu"
+        Write-Host ""
+        Write-Ask "Choice: "
+        
+        $choice = Read-Host
+        
+        switch ($choice) {
+            "1" {
+                Write-Host ""
+                Write-Ask "Enter Ngrok authtoken (from https://dashboard.ngrok.com): "
+                $token = Read-Host
+                
+                if ($token) {
+                    # Configure ngrok
+                    $ngrokPath = "$BIN_DIR\ngrok.exe"
+                    $result = & $ngrokPath config add-authtoken $token 2>&1
+                    
+                    if ($LASTEXITCODE -eq 0) {
+                        Set-ConfigValue "ngrok_token" $token
+                        Write-Success "Ngrok authtoken saved and configured!"
+                    } else {
+                        Write-ErrorMsg "Failed to configure ngrok authtoken"
+                    }
+                } else {
+                    Write-Warn "Token cannot be empty!"
+                }
+                Start-Sleep -Seconds 2
+            }
+            "2" {
+                Write-Host ""
+                Write-Ask "Enter Loclx access token (from https://localxpose.io): "
+                $token = Read-Host
+                
+                if ($token) {
+                    Set-ConfigValue "loclx_token" $token
+                    Write-Success "Loclx access token saved!"
+                } else {
+                    Write-Warn "Token cannot be empty!"
+                }
+                Start-Sleep -Seconds 2
+            }
+            "3" {
+                Write-Host ""
+                Write-Host "$($C.Cyan)Current API Keys:$($C.Reset)"
+                Write-Host ("━" * 40)
+                
+                $ngrokToken = Get-ConfigValue "ngrok_token"
+                $loclxToken = Get-ConfigValue "loclx_token"
+                
+                if ($ngrokToken) {
+                    Write-Host "$($C.Green)[✓]$($C.Reset) Ngrok: $($ngrokToken.Substring(0, [Math]::Min(15, $ngrokToken.Length)))***"
+                } else {
+                    Write-Host "$($C.Red)[✗]$($C.Reset) Ngrok: Not configured"
+                }
+                
+                if ($loclxToken) {
+                    Write-Host "$($C.Green)[✓]$($C.Reset) Loclx: $($loclxToken.Substring(0, [Math]::Min(15, $loclxToken.Length)))***"
+                } else {
+                    Write-Host "$($C.Red)[✗]$($C.Reset) Loclx: Not configured"
+                }
+                
+                Write-Host ""
+                Write-Host "$($C.Yellow)Note: API keys enable premium features and remove rate limits$($C.Reset)"
+                Write-Ask "`nPress ENTER to continue..."
+                Read-Host | Out-Null
+            }
+            "4" {
+                Write-Host ""
+                Write-Host "$($C.Yellow)Remove which key?$($C.Reset)"
+                Write-Host "1) Ngrok"
+                Write-Host "2) Loclx"
+                Write-Host "3) Both"
+                Write-Host "0) Cancel"
+                Write-Ask "`nChoice: "
+                
+                $removeChoice = Read-Host
+                
+                switch ($removeChoice) {
+                    "1" {
+                        Remove-ConfigValue "ngrok_token"
+                        Write-Success "Ngrok token removed!"
+                    }
+                    "2" {
+                        Remove-ConfigValue "loclx_token"
+                        Write-Success "Loclx token removed!"
+                    }
+                    "3" {
+                        Remove-ConfigValue "ngrok_token"
+                        Remove-ConfigValue "loclx_token"
+                        Write-Success "All tokens removed!"
+                    }
+                }
+                Start-Sleep -Seconds 2
+            }
+            "0" {
+                return
+            }
+            default {
+                Write-Warn "Invalid choice!"
+                Start-Sleep -Seconds 2
+            }
+        }
+    }
+}
+
+# ---------------------------
 # Start Local Server
 # ---------------------------
 function Start-LocalServer($path, $port, $mode) {
@@ -259,18 +419,28 @@ function Start-LocalServer($path, $port, $mode) {
     
     try {
         $script:ServerProcess = [System.Diagnostics.Process]::Start($psi)
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 3
         
-        # Verify server started
-        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port" -Method Head -TimeoutSec 2 -ErrorAction SilentlyContinue
-        
-        if ($response.StatusCode -eq 200 -or $response) {
-            Write-Success "Server running at http://127.0.0.1:$port"
-            return $true
-        } else {
-            Write-ErrorMsg "Server failed to start!"
-            return $false
+        # Verify server started (retry up to 5 times)
+        $retries = 0
+        while ($retries -lt 5) {
+            try {
+                $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port" -Method Head -TimeoutSec 2 -ErrorAction SilentlyContinue
+                
+                if ($response) {
+                    Write-Success "Server running at http://127.0.0.1:$port"
+                    return $true
+                }
+            } catch {
+                # Continue retrying
+            }
+            
+            $retries++
+            Start-Sleep -Seconds 1
         }
+        
+        Write-ErrorMsg "Server failed to start! Check if port $port is already in use."
+        return $false
     } catch {
         Write-ErrorMsg "Server startup error: $_"
         return $false
@@ -292,17 +462,27 @@ function Start-NgrokTunnel($port) {
     
     try {
         $script:NgrokProcess = [System.Diagnostics.Process]::Start($psi)
-        Start-Sleep -Seconds 5
+        Start-Sleep -Seconds 6
         
-        # Extract URL from Ngrok API
-        $apiResponse = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction SilentlyContinue
-        $url = $apiResponse.tunnels[0].public_url
-        
-        if ($url) {
-            return $url.Replace("http://", "https://")
-        } else {
-            return $null
+        # Extract URL from Ngrok API (retry up to 10 times)
+        $retries = 0
+        while ($retries -lt 10) {
+            try {
+                $apiResponse = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction SilentlyContinue
+                $url = $apiResponse.tunnels[0].public_url
+                
+                if ($url) {
+                    return $url.Replace("http://", "https://")
+                }
+            } catch {
+                # Continue retrying
+            }
+            
+            $retries++
+            Start-Sleep -Seconds 1
         }
+        
+        return $null
     } catch {
         Write-Warn "Ngrok tunnel failed"
         return $null
@@ -318,6 +498,11 @@ function Start-CloudflareTunnel($port) {
     $cfPath = "$BIN_DIR\cloudflared.exe"
     $logPath = "$LOG_DIR\cloudflare.log"
     
+    # Clear old log
+    if (Test-Path $logPath) {
+        Remove-Item $logPath -Force
+    }
+    
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $cfPath
     $psi.Arguments = "tunnel --url http://127.0.0.1:$port --logfile `"$logPath`""
@@ -326,14 +511,20 @@ function Start-CloudflareTunnel($port) {
     
     try {
         $script:CloudflaredProcess = [System.Diagnostics.Process]::Start($psi)
-        Start-Sleep -Seconds 6
+        Start-Sleep -Seconds 8
         
-        # Extract URL from log file
-        if (Test-Path $logPath) {
-            $logContent = Get-Content $logPath -Raw
-            if ($logContent -match "https://[\w-]+\.trycloudflare\.com") {
-                return $matches[0]
+        # Extract URL from log file (retry up to 15 times)
+        $retries = 0
+        while ($retries -lt 15) {
+            if (Test-Path $logPath) {
+                $logContent = Get-Content $logPath -Raw
+                if ($logContent -match "https://[\w-]+\.trycloudflare\.com") {
+                    return $matches[0]
+                }
             }
+            
+            $retries++
+            Start-Sleep -Seconds 1
         }
         
         return $null
@@ -357,9 +548,22 @@ function Start-LoclxTunnel($port) {
     
     $logPath = "$LOG_DIR\loclx.log"
     
+    # Clear old log
+    if (Test-Path $logPath) {
+        Remove-Item $logPath -Force
+    }
+    
+    # Build arguments with token if available
+    $args = "tunnel http --to :$port"
+    $loclxToken = Get-ConfigValue "loclx_token"
+    
+    if ($loclxToken) {
+        $args += " --token $loclxToken"
+    }
+    
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $loclxPath
-    $psi.Arguments = "tunnel http --to :$port"
+    $psi.Arguments = $args
     $psi.CreateNoWindow = $true
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
@@ -367,17 +571,36 @@ function Start-LoclxTunnel($port) {
     
     try {
         $script:LoclxProcess = [System.Diagnostics.Process]::Start($psi)
-        $script:LoclxProcess.StandardOutput.BaseStream.BeginRead((New-Object byte[] 4096), 0, 4096, $null, $null)
-        $script:LoclxProcess.StandardError.BaseStream.BeginRead((New-Object byte[] 4096), 0, 4096, $null, $null)
         
-        Start-Sleep -Seconds 6
+        # Redirect output to log file
+        $outputReader = $script:LoclxProcess.StandardOutput
+        $errorReader = $script:LoclxProcess.StandardError
         
-        # Try to read from log or output
-        if (Test-Path $logPath) {
-            $logContent = Get-Content $logPath -Raw
-            if ($logContent -match "https://[\w-]+\.loclx\.io") {
+        Start-Sleep -Seconds 8
+        
+        # Try to read URL from output
+        $retries = 0
+        while ($retries -lt 15) {
+            # Check if process wrote any output
+            $output = ""
+            if (-not $outputReader.EndOfStream) {
+                $output = $outputReader.ReadLine()
+            }
+            
+            if ($output -match "https://[\w-]+\.loclx\.io") {
                 return $matches[0]
             }
+            
+            # Also check log file if it exists
+            if (Test-Path $logPath) {
+                $logContent = Get-Content $logPath -Raw
+                if ($logContent -match "https://[\w-]+\.loclx\.io") {
+                    return $matches[0]
+                }
+            }
+            
+            $retries++
+            Start-Sleep -Seconds 1
         }
         
         return $null
@@ -391,6 +614,8 @@ function Start-LoclxTunnel($port) {
 # Start All Tunnels
 # ---------------------------
 function Start-AllTunnels($port) {
+    Write-Warn "Starting all tunnels (this may take ~30 seconds)..."
+    
     $results = @{}
     
     $results.Ngrok = Start-NgrokTunnel $port
@@ -414,10 +639,12 @@ function Show-Results($urls) {
     
     foreach ($service in $urls.Keys) {
         if ($urls[$service]) {
-            Write-Success "$service : $($C.Cyan)$($urls[$service])$($C.Reset)"
+            $serviceName = $service.PadRight(12)
+            Write-Success "$serviceName : $($C.Cyan)$($urls[$service])$($C.Reset)"
             $activeCount++
         } else {
-            Write-Warn "$service : Failed to start"
+            $serviceName = $service.PadRight(12)
+            Write-Warn "$serviceName : Failed to start"
         }
     }
     
@@ -425,9 +652,22 @@ function Show-Results($urls) {
     
     if ($activeCount -eq 0) {
         Write-ErrorMsg "All tunnels failed to start!"
+        Write-Warn "Troubleshooting:"
+        Write-Warn "• Check your internet connection"
+        Write-Warn "• Verify firewall settings"
+        Write-Warn "• Try configuring API keys (Menu option 2)"
+        Write-Warn "• Check logs in: $LOG_DIR"
+        Write-Host ""
+        Write-Host "$($C.Yellow)Server is still accessible locally at the displayed port$($C.Reset)"
         return $false
     } else {
         Write-Host "$($C.Green)$activeCount/$($urls.Count) tunnels active$($C.Reset)"
+        
+        if ($activeCount -lt $urls.Count) {
+            Write-Host ""
+            Write-Host "$($C.Cyan)TIP: Configure API keys for better reliability (Menu option 2)$($C.Reset)"
+        }
+        
         return $true
     }
 }
@@ -437,13 +677,23 @@ function Show-Results($urls) {
 # ---------------------------
 function Get-UserDirectory {
     while ($true) {
-        Write-Ask "Enter directory path to host: "
-        $path = Read-Host
+        Write-Ask "Enter directory path to host (or '.' for current): "
+        $input = Read-Host
+        
+        if ([string]::IsNullOrWhiteSpace($input)) {
+            Write-Warn "Please enter a valid directory path!"
+            continue
+        }
+        
+        # Convert to absolute path
+        $path = [System.IO.Path]::GetFullPath($input)
         
         if (Test-Path $path -PathType Container) {
+            Write-Info "Selected directory: $path"
             return $path
         } else {
             Write-Warn "Directory '$path' does not exist!"
+            Write-Warn "Please enter a valid path (e.g., C:\mysite or .\mysite)"
         }
     }
 }
@@ -451,7 +701,7 @@ function Get-UserDirectory {
 function Get-ServerMode {
     Write-Host ""
     Write-Host "$($C.Yellow)Select hosting protocol:$($C.Reset)"
-    Write-Host "1) Python (http.server)"
+    Write-Host "1) Python (http.server) - Recommended"
     Write-Host "2) PHP (built-in server)"
     Write-Host "3) NodeJS (http-server)"
     Write-Ask "Choice [1-3] (default: 1): "
@@ -484,6 +734,21 @@ function Get-ServerPort {
         return $DEFAULT_PORT
     }
     
+    # Check if port is in use
+    $portInUse = Get-NetTCPConnection -LocalPort $portNum -ErrorAction SilentlyContinue
+    
+    if ($portInUse) {
+        Write-Warn "Port $portNum is already in use!"
+        Write-Ask "Try anyway? (y/N): "
+        $choice = Read-Host
+        
+        if ($choice -eq "y" -or $choice -eq "Y") {
+            return $portNum
+        } else {
+            return Get-ServerPort
+        }
+    }
+    
     return $portNum
 }
 
@@ -495,14 +760,65 @@ function Show-About {
     Write-Host $LOGO
     Write-Host @"
 
-$($C.Red)[Tool Name]   $($C.Cyan): Local2Internet v4
-$($C.Red)[Version]     $($C.Cyan): 4.0 Windows Edition
-$($C.Red)[Description] $($C.Cyan): Localhost Exposing Tool
+$($C.Red)[Tool Name]   $($C.Cyan): Local2Internet v$VERSION
+$($C.Red)[Description] $($C.Cyan): Advanced LocalHost Exposing Tool
 $($C.Red)[Author]      $($C.Cyan): KasRoudra
-$($C.Red)[Contributor] $($C.Cyan): Muhammad Taezeem Tariq Matta
+$($C.Red)[Enhanced By] $($C.Cyan): Muhammad Taezeem Tariq Matta
 $($C.Red)[Platform]    $($C.Cyan): Windows PowerShell
+$($C.Red)[Github]      $($C.Cyan): https://github.com/Taezeem14/Local2Internet
 $($C.Red)[License]     $($C.Cyan): MIT Open Source
+$($C.Red)[Features]    $($C.Cyan): • Triple Tunneling (Ngrok, Cloudflare, Loclx)
+              $($C.Cyan)  • API Key Support
+              $($C.Cyan)  • Auto Port Detection
+              $($C.Cyan)  • Multi-Protocol Server (Python/PHP/NodeJS)
+              $($C.Cyan)  • Enhanced Error Handling
 $($C.Reset)
+
+"@
+    Write-Ask "Press ENTER to continue..."
+    Read-Host | Out-Null
+}
+
+# ---------------------------
+# Help Screen
+# ---------------------------
+function Show-Help {
+    Clear-Host
+    Write-Host $LOGO
+    Write-Host @"
+
+$($C.Cyan)═══════════════════════════════════════════════════════════
+                        HELP GUIDE
+═══════════════════════════════════════════════════════════$($C.Reset)
+
+$($C.Yellow)GETTING STARTED:$($C.Reset)
+  1. Select "Start Server & Tunnels" from main menu
+  2. Enter the directory path you want to host
+  3. Choose your preferred server protocol
+  4. Enter a port number (or use default)
+  5. Wait for tunnels to initialize (~30 seconds)
+  6. Share the public URLs with others!
+
+$($C.Yellow)API KEY CONFIGURATION:$($C.Reset)
+  • Ngrok: Get authtoken from https://dashboard.ngrok.com
+  • Loclx: Get access token from https://localxpose.io/dashboard
+  
+  Benefits: Remove rate limits, persistent URLs, priority support
+
+$($C.Yellow)TROUBLESHOOTING:$($C.Reset)
+  • Port in use: Choose a different port or close conflicting apps
+  • Tunnels fail: Check firewall, internet connection, add API keys
+  • Server fails: Ensure directory has index.html or index.php
+  • Permission errors: Run PowerShell as Administrator
+
+$($C.Yellow)LOGS LOCATION:$($C.Reset)
+  $LOG_DIR
+
+$($C.Yellow)KEYBOARD SHORTCUTS:$($C.Reset)
+  • CTRL+C: Stop server and return to menu
+  • Any menu: Type number and press ENTER
+
+$($C.Cyan)═══════════════════════════════════════════════════════════$($C.Reset)
 
 "@
     Write-Ask "Press ENTER to continue..."
@@ -522,8 +838,23 @@ function Show-MainMenu {
         Write-Host "$($C.Yellow)╚════════════════════════════════════════╝$($C.Reset)"
         Write-Host ""
         Write-Host "1) Start Server & Tunnels"
-        Write-Host "2) About"
+        Write-Host "2) Manage API Keys"
+        Write-Host "3) Help & Documentation"
+        Write-Host "4) About"
         Write-Host "0) Exit"
+        
+        # Show API key status
+        Write-Host ""
+        Write-Host "$($C.Cyan)API Keys Status:$($C.Reset)"
+        
+        $ngrokToken = Get-ConfigValue "ngrok_token"
+        $loclxToken = Get-ConfigValue "loclx_token"
+        
+        $ngrokStatus = if ($ngrokToken) { "$($C.Green)Configured$($C.Reset)" } else { "$($C.Red)Not Set$($C.Reset)" }
+        $loclxStatus = if ($loclxToken) { "$($C.Green)Configured$($C.Reset)" } else { "$($C.Red)Not Set$($C.Reset)" }
+        
+        Write-Host "  Ngrok: $ngrokStatus | Loclx: $loclxStatus"
+        
         Write-Host ""
         Write-Ask "Choice: "
         
@@ -531,7 +862,9 @@ function Show-MainMenu {
         
         switch ($choice) {
             "1" { Start-MainFlow }
-            "2" { Show-About }
+            "2" { Manage-APIKeys }
+            "3" { Show-Help }
+            "4" { Show-About }
             "0" {
                 Write-Host ""
                 Write-Host "$($C.Green)Goodbye! 👋$($C.Reset)"
@@ -539,7 +872,7 @@ function Show-MainMenu {
                 exit 0
             }
             default {
-                Write-Warn "Invalid choice! Please select 1, 2, or 0"
+                Write-Warn "Invalid choice! Please select 1-4 or 0"
                 Start-Sleep -Seconds 2
             }
         }
@@ -575,7 +908,7 @@ function Start-MainFlow {
     
     if (-not $success) {
         Stop-AllProcesses
-        Start-Sleep -Seconds 3
+        Start-Sleep -Seconds 5
         return
     }
     
@@ -614,6 +947,29 @@ try {
     Initialize-Directories
     Install-Dependencies
     Install-Tools
+    
+    # Show welcome message on first run
+    $firstRun = Get-ConfigValue "first_run_done"
+    
+    if (-not $firstRun) {
+        Clear-Host
+        Write-Host $LOGO
+        Write-Host ""
+        Write-Host "$($C.Green)╔════════════════════════════════════════╗$($C.Reset)"
+        Write-Host "$($C.Green)║     WELCOME TO LOCAL2INTERNET v$VERSION   ║$($C.Reset)"
+        Write-Host "$($C.Green)╚════════════════════════════════════════╝$($C.Reset)"
+        Write-Host ""
+        Write-Host "$($C.Cyan)First-time setup complete!$($C.Reset)"
+        Write-Host "$($C.Yellow)• All dependencies verified$($C.Reset)"
+        Write-Host "$($C.Yellow)• Tunneling tools downloaded$($C.Reset)"
+        Write-Host "$($C.Yellow)• Ready to expose your localhost!$($C.Reset)"
+        Write-Host ""
+        Write-Host "$($C.Cyan)TIP: Configure API keys for premium features (Menu option 2)$($C.Reset)"
+        Write-Host ""
+        Set-ConfigValue "first_run_done" $true
+        Start-Sleep -Seconds 3
+    }
+    
     Show-MainMenu
 } catch {
     Write-Host ""
