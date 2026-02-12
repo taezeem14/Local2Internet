@@ -69,7 +69,7 @@ class ConfigManager
 
   def load_config
     if File.exist?(CONFIG_FILE)
-      YAML.load_file(CONFIG_FILE) rescue {}
+      YAML.safe_load(File.read(CONFIG_FILE)) rescue {}
     else
       {}
     end
@@ -155,11 +155,12 @@ end
 
 def cleanup
   info "Cleaning up processes..."
-  %w[php ngrok cloudflared wget curl unzip python3 http-server loclx].each do |proc|
-    exec_silent("killall #{proc}")
+  %w[ngrok cloudflared loclx http-server].each do |proc|
+    exec_silent("pkill -f #{proc}")
   end
   sleep 1
 end
+
 
 # ------------------ DEPENDENCY MANAGER ------------------
 
@@ -849,7 +850,7 @@ begin
   # Start main menu
   main_menu(config)
   
-rescue Exception => e
+rescue StandardError => e
   puts "\n#{RED}[FATAL ERROR] #{e.message}#{RESET}"
   puts e.backtrace.join("\n") if ENV["DEBUG"]
   cleanup
