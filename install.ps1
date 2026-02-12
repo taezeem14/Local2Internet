@@ -1,10 +1,9 @@
 # =========================================
-# Local2Internet v4 - Auto Installer
+# Local2Internet v4.1 - Advanced Auto Installer
 # Platform: Windows PowerShell
 # Author: Muhammad Taezeem Tariq Matta
 # =========================================
 
-# Requires PowerShell 5.1+
 #Requires -Version 5.1
 
 $ErrorActionPreference = "Stop"
@@ -32,13 +31,13 @@ $($C.Red)
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀
 $($C.Yellow)▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░
 $($C.Green)▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-$($C.Blue)                                      [Auto Installer v4.0]
+$($C.Blue)                                      [Auto Installer v4.1 Advanced]
 $($C.Reset)
 "@
 
 Clear-Host
 Write-Host $LOGO
-Write-Info "Starting Local2Internet installation..."
+Write-Info "Starting Local2Internet Advanced installation..."
 Write-Host ""
 
 # Check PowerShell version
@@ -119,11 +118,11 @@ $toInstall = @()
 foreach ($cmd in $dependencies.Keys) {
     if (Get-Command $cmd -ErrorAction SilentlyContinue) {
         $version = switch ($cmd) {
-            "ruby" { (ruby --version).Split()[1] }
-            "python" { (python --version).Split()[1] }
-            "node" { (node --version) }
-            "php" { (php --version).Split()[0].Split()[1] }
-            "git" { (git --version).Split()[2] }
+            "ruby" { (ruby --version 2>$null).Split()[1] }
+            "python" { (python --version 2>$null).Split()[1] }
+            "node" { (node --version 2>$null) }
+            "php" { (php --version 2>$null).Split()[0].Split()[1] }
+            "git" { (git --version 2>$null).Split()[2] }
         }
         Write-Success "  → $cmd already installed ($version)"
     } else {
@@ -149,7 +148,7 @@ if ($toInstall.Count -gt 0) {
     foreach ($pkg in $toInstall) {
         try {
             Write-Info "Installing $pkg..."
-            choco install $pkg -y --force | Out-Null
+            $output = choco install $pkg -y --force 2>&1
             Write-Success "$pkg installed!"
         } catch {
             Write-Warn "Failed to install $pkg (non-critical)"
@@ -175,7 +174,7 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
         
         if (-not $httpServer) {
             Write-Info "Installing http-server..."
-            npm install -g http-server | Out-Null
+            npm install -g http-server 2>&1 | Out-Null
             Write-Success "http-server installed!"
         } else {
             Write-Success "http-server already installed"
@@ -204,7 +203,7 @@ if (Test-Path $installDir) {
         Write-Info "Updating existing installation..."
         try {
             Push-Location $installDir
-            git pull origin main | Out-Null
+            $output = git pull origin main 2>&1
             Write-Success "Repository updated!"
             Pop-Location
             
@@ -218,7 +217,12 @@ if (Test-Path $installDir) {
             Write-Host ""
             Write-Info "To run Local2Internet:"
             Write-Host "  $($C.Yellow)cd $installDir$($C.Reset)"
-            Write-Host "  $($C.Yellow).\l2in.ps1$($C.Reset)"
+            
+            if (Test-Path "$installDir\l2in_advanced.ps1") {
+                Write-Host "  $($C.Yellow).\l2in_advanced.ps1$($C.Reset)"
+            } else {
+                Write-Host "  $($C.Yellow).\l2in.ps1$($C.Reset)"
+            }
             Write-Host ""
             exit 0
         } catch {
@@ -229,7 +233,7 @@ if (Test-Path $installDir) {
 
 Write-Info "Cloning Local2Internet repository..."
 try {
-    git clone https://github.com/Taezeem14/Local2Internet.git $installDir 2>&1 | Out-Null
+    $output = git clone https://github.com/Taezeem14/Local2Internet.git $installDir 2>&1
     Write-Success "Repository cloned!"
 } catch {
     Write-ErrorMsg "Failed to clone repository: $_"
@@ -257,10 +261,17 @@ if ($createShortcut -ne 'n' -and $createShortcut -ne 'N') {
         $WshShell = New-Object -ComObject WScript.Shell
         $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\Local2Internet.lnk")
         $Shortcut.TargetPath = "powershell.exe"
-        $Shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$installDir\l2in.ps1`""
+        
+        # Use advanced version if available
+        if (Test-Path "$installDir\l2in_advanced.ps1") {
+            $Shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$installDir\l2in_advanced.ps1`""
+        } else {
+            $Shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$installDir\l2in.ps1`""
+        }
+        
         $Shortcut.WorkingDirectory = $installDir
         $Shortcut.IconLocation = "powershell.exe,0"
-        $Shortcut.Description = "Local2Internet v4 - Expose localhost to internet"
+        $Shortcut.Description = "Local2Internet v4.1 Advanced - Expose localhost to internet"
         $Shortcut.Save()
         
         Write-Success "Desktop shortcut created!"
@@ -281,7 +292,7 @@ if ($addToPath -ne 'n' -and $addToPath -ne 'N') {
         if ($currentPath -notlike "*$installDir*") {
             [Environment]::SetEnvironmentVariable("Path", "$currentPath;$installDir", "User")
             $env:Path += ";$installDir"
-            Write-Success "Added to PATH! You can now run 'l2in.ps1' from anywhere"
+            Write-Success "Added to PATH! You can now run scripts from anywhere"
         } else {
             Write-Success "Already in PATH"
         }
@@ -296,17 +307,29 @@ Write-Host "$($C.Green)║     INSTALLATION SUCCESSFUL! 🎉        ║$($C.Rese
 Write-Host "$($C.Green)╚════════════════════════════════════════╝$($C.Reset)"
 Write-Host ""
 
-Write-Success "Local2Internet v4 installed successfully!"
+Write-Success "Local2Internet v4.1 Advanced installed successfully!"
 Write-Host ""
 Write-Info "Installation location: $($C.Yellow)$installDir$($C.Reset)"
 Write-Host ""
+Write-Info "New features in v4.1:"
+Write-Host "  $($C.Cyan)• API Key Support (Ngrok & Loclx)$($C.Reset)"
+Write-Host "  $($C.Cyan)• Enhanced Error Handling$($C.Reset)"
+Write-Host "  $($C.Cyan)• Auto Port Detection$($C.Reset)"
+Write-Host "  $($C.Cyan)• Configuration Persistence$($C.Reset)"
+Write-Host "  $($C.Cyan)• Improved Tunnel Reliability$($C.Reset)"
+Write-Host ""
 Write-Info "To start using Local2Internet:"
 Write-Host "  $($C.Yellow)cd $installDir$($C.Reset)"
-Write-Host "  $($C.Yellow).\l2in.ps1$($C.Reset)"
+
+if (Test-Path "$installDir\l2in_advanced.ps1") {
+    Write-Host "  $($C.Yellow).\l2in_advanced.ps1$($C.Reset)"
+} else {
+    Write-Host "  $($C.Yellow).\l2in.ps1$($C.Reset)"
+}
 Write-Host ""
 
 if ($addToPath -ne 'n' -and $addToPath -ne 'N') {
-    Write-Info "Or simply run: $($C.Yellow)l2in.ps1$($C.Reset) from anywhere"
+    Write-Info "Or simply run the script from anywhere (after restarting terminal)"
     Write-Host ""
 }
 
@@ -318,7 +341,12 @@ if ($runNow -ne 'n' -and $runNow -ne 'N') {
     Write-Info "Starting Local2Internet..."
     Start-Sleep -Seconds 1
     Set-Location $installDir
-    & ".\l2in.ps1"
+    
+    if (Test-Path ".\l2in_advanced.ps1") {
+        & ".\l2in_advanced.ps1"
+    } else {
+        & ".\l2in.ps1"
+    }
 } else {
     Write-Host ""
     Write-Info "Thanks for installing! Happy tunneling! 🚀"
