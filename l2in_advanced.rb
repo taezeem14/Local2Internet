@@ -269,35 +269,28 @@ def download_loclx
 
   info "Downloading loclx..."
 
-  url = case arch
-  when /arm(?!64)/ then "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-linux-arm.zip"
-  when /aarch64|arm64/ then "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-linux-arm64.zip"
-  when /x86_64/ then "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-linux-amd64.zip"
-  else "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-linux-386.zip"
-  end
-
+  url = "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-linux-amd64.zip"
   tmp = "#{BASE_DIR}/loclx.zip"
-  
-  if exec_silent("wget -q --show-progress #{url} -O #{tmp}")
-    if exec_silent("unzip -q #{tmp} -d #{BIN_DIR}")
-      exec_silent("chmod +x #{TOOLS[:loclx]}")
-      File.delete(tmp) if File.exist?(tmp)
-      success "Loclx installed!"
-    else
-      warn "Failed to extract loclx (non-critical)"
-      File.delete(tmp) if File.exist?(tmp)
-    end
-  else
-    warn "Failed to download loclx (non-critical)"
-    File.delete(tmp) if File.exist?(tmp)
+
+  abort_with("wget not found!") unless command_exists?("wget")
+  abort_with("unzip not found!") unless command_exists?("unzip")
+
+  unless exec_silent("wget #{url} -O #{tmp}")
+    warn "Loclx download failed"
+    return
   end
+
+  unless exec_silent("unzip -o #{tmp} -d #{BIN_DIR}")
+    warn "Loclx unzip failed"
+    return
+  end
+
+  exec_silent("chmod +x #{TOOLS[:loclx]}")
+  File.delete(tmp) rescue nil
+
+  success "Loclx installed!"
 end
 
-def download_tools
-  download_ngrok
-  download_cloudflared
-  download_loclx
-end
 
 # ------------------ API KEY MANAGER ------------------
 
