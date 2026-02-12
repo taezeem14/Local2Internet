@@ -291,6 +291,13 @@ def download_loclx
   success "Loclx installed!"
 end
 
+def download_tools
+  info "Checking and downloading tunneling tools..."
+
+  download_ngrok
+  download_cloudflared
+  download_loclx
+end
 
 # ------------------ API KEY MANAGER ------------------
 
