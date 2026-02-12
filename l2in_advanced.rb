@@ -102,7 +102,7 @@ end
 # ------------------ UTILITIES ------------------
 
 def exec_silent(cmd)
-  system("#{cmd} > /dev/null 2>&1")
+  system(cmd)
 end
 
 def command_exists?(cmd)
@@ -155,12 +155,14 @@ end
 
 def cleanup
   info "Cleaning up processes..."
-  %w[ngrok cloudflared loclx http-server].each do |proc|
+
+  %w[ngrok loclx http-server].each do |proc|
     exec_silent("pkill -f #{proc}")
   end
+
+  exec_silent("pkill -f 'cloudflared tunnel'")
   sleep 1
 end
-
 
 # ------------------ DEPENDENCY MANAGER ------------------
 
