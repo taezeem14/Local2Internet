@@ -53,7 +53,7 @@ LOGO = """
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀ 
 #{YELLOW}▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░ 
 #{GREEN}▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-#{BLUE}                                                    [v4 Enhanced]
+#{BLUE}                                                    [v4 Enhanced - FIXED]
 #{RESET}
 """
 
@@ -247,7 +247,7 @@ end
 # ------------------ SERVER MANAGER ------------------
 
 def start_server(path, port, mode)
-  info "Starting #{mode.upcase} server on port #{port}..."
+  info "Starting #{mode.to_s.upcase} server on port #{port}..."
   
   case mode
   when :python
@@ -363,7 +363,7 @@ def select_server
   puts "3) NodeJS (http-server)"
   ask "Choice [1-3] (default: 1): "
 
-  choice = gets.chomp
+  choice = gets.chomp.strip
   choice = "1" if choice.empty?
 
   case choice
@@ -378,11 +378,25 @@ end
 
 def get_directory
   loop do
-    ask "Enter directory path to host: "
-    path = gets.chomp.strip
+    ask "Enter directory path to host (or '.' for current): "
+    input = gets.chomp.strip
     
-    return path if Dir.exist?(path)
-    warn "Directory '#{path}' does not exist!"
+    # Handle empty input
+    if input.empty?
+      warn "Please enter a valid directory path!"
+      next
+    end
+    
+    # Convert relative paths to absolute
+    path = File.expand_path(input)
+    
+    if Dir.exist?(path)
+      info "Selected directory: #{path}"
+      return path
+    else
+      warn "Directory '#{path}' does not exist!"
+      warn "Please enter a valid absolute or relative path (without 'cd')"
+    end
   end
 end
 
@@ -404,7 +418,7 @@ end
 def display_results(urls)
   puts "\n#{GREEN}╔════════════════════════════════════════╗#{RESET}"
   puts "#{GREEN}║          PUBLIC URLS READY!            ║#{RESET}"
-  puts "#{GREEN}╔════════════════════════════════════════╗#{RESET}\n"
+  puts "#{GREEN}╚════════════════════════════════════════╝#{RESET}\n"
   
   active_count = 0
   
@@ -433,7 +447,7 @@ def show_about
   puts LOGO
   puts """
 #{RED}[Tool Name]   #{CYAN}: Local2Internet v4
-#{RED}[Version]     #{CYAN}: 4.0 Enhanced
+#{RED}[Version]     #{CYAN}: 4.0 Enhanced (Fixed)
 #{RED}[Description] #{CYAN}: LocalHost Exposing Tool
 #{RED}[Author]      #{CYAN}: KasRoudra
 #{RED}[Contributor] #{CYAN}: Muhammad Taezeem Tariq Matta
@@ -475,7 +489,7 @@ def main_menu
     puts "0) Exit"
     
     ask "\nChoice: "
-    choice = gets.chomp
+    choice = gets.chomp.strip
 
     case choice
     when "1"
@@ -483,6 +497,7 @@ def main_menu
     when "2"
       show_about
     when "0"
+      cleanup
       puts "\n#{GREEN}Goodbye! 👋#{RESET}\n"
       exit 0
     else
@@ -514,9 +529,9 @@ def run_server
   has_urls = display_results(urls)
   
   # Keep alive
-  puts "\n#{RED}Press CTRL+C to stop#{RESET}\n"
+  puts "\n#{RED}Press CTRL+C to stop and return to menu#{RESET}\n"
   begin
-    sleep 86400
+    loop { sleep 10 }
   rescue SystemExit, Interrupt
     # Handled by signal trap
   end
