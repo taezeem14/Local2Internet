@@ -384,7 +384,7 @@ Contributions are **highly welcome**! Here's how you can help:
 
 ### 🚀 Enhanced & Maintained By
 **Muhammad Taezeem Tariq Matta (Bro)**
-- 🎓 Grade 7 Student @ SRM WELKIN Higher Secondary School, Sopore
+- 🎓 Grade 8 Student @ SRM WELKIN Higher Secondary School, Sopore
 - 💻 Full-Stack Developer | Cybersecurity Enthusiast | Ethical Hacker
 - 📧 Email: [taezeem@taezeem.me](mailto:taezeem@taezeem.me)
 - 💬 Telegram: [@Taezeem_14](https://t.me/Taezeem_14)
@@ -408,7 +408,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 MIT License
 
 Copyright (c) 2021 KasRoudra
-Copyright (c) 2025 Muhammad Taezeem Tariq Matta
+Copyright (c) 2026 Muhammad Taezeem Tariq Matta
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -476,16 +476,6 @@ If you find this project useful, please consider giving it a ⭐ on GitHub!
 - ⭐ Star the repo to get notifications
 - 👀 Watch for releases
 - 🔔 Enable GitHub notifications
-
----
-
-## 📸 Screenshots
-
-### Linux/Termux
-![Linux Screenshot](https://via.placeholder.com/800x400/1a1a1a/00ff00?text=Local2Internet+v4+Linux)
-
-### Windows PowerShell
-![Windows Screenshot](https://via.placeholder.com/800x400/012456/00aaff?text=Local2Internet+v4+Windows)
 
 ---
 
