@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =========================================
-# Local2Internet v4 - Auto Installer
+# Local2Internet v4.1 - Advanced Auto Installer
 # Platform: Linux / Termux
 # Author: Muhammad Taezeem Tariq Matta
 # =========================================
@@ -27,10 +27,10 @@ echo -e "${RED}
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀
 ${YELLOW}▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░
 ${GREEN}▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-${BLUE}                                      [Auto Installer v4.0]
+${BLUE}                                      [Auto Installer v4.1 Advanced]
 ${RESET}"
 
-info "Starting Local2Internet installation..."
+info "Starting Local2Internet Advanced installation..."
 echo ""
 
 # Detect OS
@@ -72,13 +72,13 @@ fi
 info "Updating package manager..."
 case $PKG_MANAGER in
     pkg)
-        pkg update -y || error "Failed to update package manager"
+        pkg update -y 2>&1 | grep -v "^Reading" || error "Failed to update package manager"
         ;;
     apt)
         if [ "$EUID" -ne 0 ]; then
-            sudo apt update -y || error "Failed to update package manager"
+            sudo apt update -y 2>&1 | grep -v "^Hit:" || error "Failed to update package manager"
         else
-            apt update -y || error "Failed to update package manager"
+            apt update -y 2>&1 | grep -v "^Hit:" || error "Failed to update package manager"
         fi
         ;;
     pacman)
@@ -99,7 +99,7 @@ esac
 success "Package manager updated!"
 
 # Install dependencies
-info "Installing dependencies..."
+info "Checking and installing dependencies..."
 echo ""
 
 DEPS_TO_INSTALL=""
@@ -168,6 +168,16 @@ else
     success "  → git already installed"
 fi
 
+# Termux: check for proot
+if [ "$PLATFORM" = "termux" ]; then
+    if ! command -v proot &> /dev/null; then
+        info "  → proot not found (needed for Termux), will install"
+        DEPS_TO_INSTALL="$DEPS_TO_INSTALL proot"
+    else
+        success "  → proot already installed (Termux compatibility)"
+    fi
+fi
+
 echo ""
 
 # Install missing dependencies
@@ -176,13 +186,13 @@ if [ -n "$DEPS_TO_INSTALL" ]; then
     
     case $PKG_MANAGER in
         pkg)
-            pkg install -y $DEPS_TO_INSTALL || error "Failed to install dependencies"
+            pkg install -y $DEPS_TO_INSTALL 2>&1 | grep -E "Installing|Upgrading|Setting up" || error "Failed to install dependencies"
             ;;
         apt)
             if [ "$EUID" -ne 0 ]; then
-                sudo apt install -y $DEPS_TO_INSTALL || error "Failed to install dependencies"
+                sudo apt install -y $DEPS_TO_INSTALL 2>&1 | grep -E "Setting up|Unpacking" || error "Failed to install dependencies"
             else
-                apt install -y $DEPS_TO_INSTALL || error "Failed to install dependencies"
+                apt install -y $DEPS_TO_INSTALL 2>&1 | grep -E "Setting up|Unpacking" || error "Failed to install dependencies"
             fi
             ;;
         pacman)
@@ -208,18 +218,29 @@ fi
 
 echo ""
 
+# Install YAML support for Ruby
+info "Checking Ruby YAML support..."
+if ! ruby -e "require 'yaml'" 2>/dev/null; then
+    warn "YAML gem not found, installing..."
+    gem install yaml 2>&1 | tail -5 || warn "YAML gem installation failed (non-critical)"
+else
+    success "Ruby YAML support available"
+fi
+
+echo ""
+
 # Install npm packages
 info "Checking npm packages..."
 if command -v npm &> /dev/null; then
     if ! npm list -g http-server &> /dev/null; then
         info "Installing http-server..."
         if [ "$PLATFORM" = "termux" ]; then
-            npm install -g http-server || error "Failed to install http-server"
+            npm install -g http-server 2>&1 | tail -3 || error "Failed to install http-server"
         else
             if [ "$EUID" -ne 0 ]; then
-                sudo npm install -g http-server || error "Failed to install http-server"
+                sudo npm install -g http-server 2>&1 | tail -3 || error "Failed to install http-server"
             else
-                npm install -g http-server || error "Failed to install http-server"
+                npm install -g http-server 2>&1 | tail -3 || error "Failed to install http-server"
             fi
         fi
         success "http-server installed!"
@@ -247,29 +268,33 @@ if [ -d "$INSTALL_DIR" ]; then
     else
         info "Updating existing installation..."
         cd "$INSTALL_DIR"
-        git pull origin main || warn "Failed to update repository"
+        git pull origin main 2>&1 | grep -E "Already up to date|Updating" || warn "Failed to update repository"
         success "Repository updated!"
         cd - > /dev/null
         echo ""
-        success "Installation complete!"
+        echo -e "${GREEN}╔════════════════════════════════════════╗${RESET}"
+        echo -e "${GREEN}║       UPDATE SUCCESSFUL! 🎉            ║${RESET}"
+        echo -e "${GREEN}╚════════════════════════════════════════╝${RESET}"
+        echo ""
+        success "Local2Internet updated successfully!"
         echo ""
         info "To run Local2Internet:"
         echo -e "  ${YELLOW}cd $INSTALL_DIR${RESET}"
-        echo -e "  ${YELLOW}./l2in.rb${RESET}"
+        echo -e "  ${YELLOW}./l2in_advanced.rb${RESET}"
         echo ""
         exit 0
     fi
 fi
 
 info "Cloning Local2Internet repository..."
-git clone https://github.com/Taezeem14/Local2Internet.git "$INSTALL_DIR" || error "Failed to clone repository"
+git clone https://github.com/Taezeem14/Local2Internet.git "$INSTALL_DIR" 2>&1 | grep -E "Cloning|Receiving" || error "Failed to clone repository"
 success "Repository cloned!"
 
 echo ""
 
-# Make executable
+# Make executables
 info "Setting permissions..."
-chmod +x "$INSTALL_DIR/l2in.rb" || error "Failed to set executable permission"
+chmod +x "$INSTALL_DIR/l2in_advanced.rb" 2>/dev/null || chmod +x "$INSTALL_DIR/l2in.rb" || error "Failed to set executable permission"
 success "Permissions set!"
 
 echo ""
@@ -279,12 +304,32 @@ if [ "$PLATFORM" != "termux" ]; then
     read -p "Create system-wide command 'l2in'? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if [ "$EUID" -ne 0 ]; then
-            sudo ln -sf "$INSTALL_DIR/l2in.rb" /usr/local/bin/l2in || warn "Failed to create symlink"
+        if [ -f "$INSTALL_DIR/l2in_advanced.rb" ]; then
+            SCRIPT_NAME="l2in_advanced.rb"
         else
-            ln -sf "$INSTALL_DIR/l2in.rb" /usr/local/bin/l2in || warn "Failed to create symlink"
+            SCRIPT_NAME="l2in.rb"
+        fi
+        
+        if [ "$EUID" -ne 0 ]; then
+            sudo ln -sf "$INSTALL_DIR/$SCRIPT_NAME" /usr/local/bin/l2in || warn "Failed to create symlink"
+        else
+            ln -sf "$INSTALL_DIR/$SCRIPT_NAME" /usr/local/bin/l2in || warn "Failed to create symlink"
         fi
         success "Command 'l2in' created! You can now run it from anywhere."
+    fi
+fi
+
+# Termux: Create alias
+if [ "$PLATFORM" = "termux" ]; then
+    echo ""
+    read -p "Add 'l2in' alias to .bashrc? (Y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        SCRIPT_NAME="l2in_advanced.rb"
+        [ ! -f "$INSTALL_DIR/$SCRIPT_NAME" ] && SCRIPT_NAME="l2in.rb"
+        
+        echo "alias l2in='$INSTALL_DIR/$SCRIPT_NAME'" >> ~/.bashrc
+        success "Alias added! Restart Termux or run: source ~/.bashrc"
     fi
 fi
 
@@ -294,13 +339,22 @@ echo -e "${GREEN}║     INSTALLATION SUCCESSFUL! 🎉        ║${RESET}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${RESET}"
 echo ""
 
-success "Local2Internet v4 installed successfully!"
+success "Local2Internet v4.1 Advanced installed successfully!"
 echo ""
 info "Installation location: ${YELLOW}$INSTALL_DIR${RESET}"
 echo ""
+info "New features in v4.1:"
+echo -e "  ${CYAN}• API Key Support (Ngrok & Loclx)${RESET}"
+echo -e "  ${CYAN}• Enhanced Termux Compatibility${RESET}"
+echo -e "  ${CYAN}• Improved Error Handling${RESET}"
+echo -e "  ${CYAN}• Auto Port Detection${RESET}"
+echo -e "  ${CYAN}• Configuration Persistence${RESET}"
+echo ""
 info "To start using Local2Internet:"
 echo -e "  ${YELLOW}cd $INSTALL_DIR${RESET}"
-echo -e "  ${YELLOW}./l2in.rb${RESET}"
+SCRIPT_NAME="l2in_advanced.rb"
+[ ! -f "$INSTALL_DIR/$SCRIPT_NAME" ] && SCRIPT_NAME="l2in.rb"
+echo -e "  ${YELLOW}./$SCRIPT_NAME${RESET}"
 echo ""
 
 if [[ $REPLY =~ ^[Yy]$ ]] && [ "$PLATFORM" != "termux" ]; then
@@ -316,7 +370,7 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     info "Starting Local2Internet..."
     sleep 1
     cd "$INSTALL_DIR"
-    ./l2in.rb
+    ./$SCRIPT_NAME
 else
     echo ""
     info "Thanks for installing! Happy tunneling! 🚀"
