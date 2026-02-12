@@ -167,12 +167,21 @@ def download_ngrok
   end
 
   tmp = "#{BASE_DIR}/ngrok.tmp"
-  exec_silent("wget -q --show-progress #{url} -O #{tmp}") || abort_with("Failed to download ngrok")
+  
+  unless exec_silent("wget -q --show-progress #{url} -O #{tmp}")
+    abort_with("Failed to download ngrok - check your internet connection")
+  end
 
   if url.include?(".tgz")
-    exec_silent("tar -xzf #{tmp} -C #{BIN_DIR}")
+    unless exec_silent("tar -xzf #{tmp} -C #{BIN_DIR}")
+      File.delete(tmp) if File.exist?(tmp)
+      abort_with("Failed to extract ngrok")
+    end
   else
-    exec_silent("unzip -q #{tmp} -d #{BIN_DIR}")
+    unless exec_silent("unzip -q #{tmp} -d #{BIN_DIR}")
+      File.delete(tmp) if File.exist?(tmp)
+      abort_with("Failed to extract ngrok")
+    end
   end
 
   exec_silent("chmod +x #{TOOLS[:ngrok]}")
@@ -192,9 +201,12 @@ def download_cloudflared
   else "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-386"
   end
 
-  exec_silent("wget -q --show-progress #{url} -O #{TOOLS[:cloudflared]}") || abort_with("Failed to download cloudflared")
-  exec_silent("chmod +x #{TOOLS[:cloudflared]}")
-  success "Cloudflared installed!"
+  if exec_silent("wget -q --show-progress #{url} -O #{TOOLS[:cloudflared]}")
+    exec_silent("chmod +x #{TOOLS[:cloudflared]}")
+    success "Cloudflared installed!"
+  else
+    warn "Failed to download cloudflared (non-critical)"
+  end
 end
 
 def download_loclx
@@ -210,11 +222,20 @@ def download_loclx
   end
 
   tmp = "#{BASE_DIR}/loclx.zip"
-  exec_silent("wget -q --show-progress #{url} -O #{tmp}") || abort_with("Failed to download loclx")
-  exec_silent("unzip -q #{tmp} -d #{BIN_DIR}")
-  exec_silent("chmod +x #{TOOLS[:loclx]}")
-  File.delete(tmp) if File.exist?(tmp)
-  success "Loclx installed!"
+  
+  if exec_silent("wget -q --show-progress #{url} -O #{tmp}")
+    if exec_silent("unzip -q #{tmp} -d #{BIN_DIR}")
+      exec_silent("chmod +x #{TOOLS[:loclx]}")
+      File.delete(tmp) if File.exist?(tmp)
+      success "Loclx installed!"
+    else
+      warn "Failed to extract loclx (non-critical)"
+      File.delete(tmp) if File.exist?(tmp)
+    end
+  else
+    warn "Failed to download loclx (non-critical)"
+    File.delete(tmp) if File.exist?(tmp)
+  end
 end
 
 def download_tools
@@ -364,20 +385,25 @@ def display_results(urls)
   puts "#{GREEN}║          PUBLIC URLS READY!            ║#{RESET}"
   puts "#{GREEN}╔════════════════════════════════════════╗#{RESET}\n"
   
+  active_count = 0
+  
   urls.each do |service, url|
     if url
       success "#{service.to_s.capitalize}: #{CYAN}#{url}#{RESET}"
+      active_count += 1
     else
       warn "#{service.to_s.capitalize}: Failed to start"
     end
   end
   
-  active_count = urls.values.compact.count
-  
   if active_count == 0
-    abort_with("All tunnels failed to start!")
+    puts "\n#{RED}All tunnels failed to start!#{RESET}"
+    warn "This might be due to network issues or firewall restrictions"
+    warn "You can still access your server locally at the displayed port"
+    return false
   else
-    puts "\n#{GREEN}#{active_count}/3 tunnels active#{RESET}"
+    puts "\n#{GREEN}#{active_count}/#{urls.size} tunnels active#{RESET}"
+    return true
   end
 end
 
@@ -464,7 +490,7 @@ def run_server
   urls = start_all_tunnels(port)
   
   # Display results
-  display_results(urls)
+  has_urls = display_results(urls)
   
   # Keep alive
   puts "\n#{RED}Press CTRL+C to stop#{RESET}\n"
