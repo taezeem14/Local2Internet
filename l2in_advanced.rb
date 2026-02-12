@@ -442,121 +442,118 @@ end
 
 # ------------------ TUNNEL MANAGER ------------------
 
+# ------------------ TUNNEL MANAGER (GOD MODE) ------------------
+
 def start_ngrok(port, config)
   info "Starting Ngrok tunnel..."
-  
-  # Use authtoken if configured
-  authtoken_configured = config.has?('ngrok_token')
-  
-cmd = if termux? && proot_available?
-    "cd #{BIN_DIR} && termux-chroot ./ngrok http #{port} > /dev/null 2>&1 &"
-  else
-    "#{TOOLS[:ngrok]} http #{port} > /dev/null 2>&1 &"
-  end
-  
-  exec_silent(cmd)
-  sleep 6
 
-  # Try to get URL from API
-  10.times do
-    url = `curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o "https://[^\\"]*ngrok[^\\"]*"`.strip
+  unless config.has?('ngrok_token')
+    warn "Ngrok authtoken not configured (may be unstable)"
+  end
+
+  File.delete(log_file("ngrok")) if File.exist?(log_file("ngrok"))
+
+  base_cmd = "#{TOOLS[:ngrok]} http #{port}"
+
+  cmd = base_cmd
+  if termux? && proot_available?
+    cmd = "cd #{BIN_DIR} && termux-chroot #{base_cmd}"
+  end
+
+  exec_silent("#{cmd} > #{log_file("ngrok")} 2>&1 &")
+  sleep termux? ? 8 : 5
+
+  # Try API first (best method)
+  12.times do
+    url = `curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o "https://[^\\"]*ngrok[^\\"]*" | head -1`.strip
     return url unless url.empty?
     sleep 1
   end
-  
+
+  # Fallback: parse logs
+  6.times do
+    url = `grep -o "https://[^ ]*ngrok[^ ]*" #{log_file("ngrok")} 2>/dev/null | head -1`.strip
+    return url unless url.empty?
+    sleep 1
+  end
+
   nil
 end
 
+
 def start_cloudflare(port)
   info "Starting Cloudflare tunnel..."
-  
-  File.delete(log_file("cloudflare")) if File.exist?(log_file("cloudflare"))
-  
-  cmd = if termux? && proot_available?
-    "cd #{BIN_DIR} && termux-chroot ./cloudflared tunnel --url http://127.0.0.1:#{port} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &"
-  elsif termux?
-    # Fallback for Termux without proot
-    "#{TOOLS[:cloudflared]} tunnel --url http://127.0.0.1:#{port} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &"
-  else
-    "#{TOOLS[:cloudflared]} tunnel --url http://127.0.0.1:#{port} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &"
-  end
-  
-  exec_silent(cmd)
-  sleep 8
 
-  # Try multiple times to get URL from log
-  15.times do
+  File.delete(log_file("cloudflare")) if File.exist?(log_file("cloudflare"))
+
+  base_cmd = "#{TOOLS[:cloudflared]} tunnel --url http://127.0.0.1:#{port}"
+
+  cmd = base_cmd
+  if termux? && proot_available?
+    cmd = "cd #{BIN_DIR} && termux-chroot #{base_cmd}"
+  end
+
+  exec_silent("#{cmd} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &")
+  sleep termux? ? 12 : 7
+
+  20.times do
     url = `grep -o "https://[^ ]*trycloudflare.com" #{log_file("cloudflare")} 2>/dev/null | head -1`.strip
     return url unless url.empty?
     sleep 1
   end
-  
+
   nil
 end
 
+
 def start_loclx(port, config)
   info "Starting Loclx tunnel..."
-  
+
   File.delete(log_file("loclx")) if File.exist?(log_file("loclx"))
-  
-  # Build command with access token if available
+
   base_cmd = "#{TOOLS[:loclx]} tunnel http --to :#{port}"
-  
+
   if config.has?('loclx_token')
     base_cmd += " --token #{config.get('loclx_token')}"
-  end
-  
-  cmd = if termux? && proot_available?
-    "cd #{BIN_DIR} && termux-chroot ./loclx tunnel http --to :#{port} > #{log_file("loclx")} 2>&1 &"
   else
-    "#{base_cmd} > #{log_file("loclx")} 2>&1 &"
+    warn "Loclx token not configured (may be limited)"
   end
-  
-  exec_silent(cmd)
-  sleep 8
 
-  # Try to get URL from log
-  15.times do
+  cmd = base_cmd
+  if termux? && proot_available?
+    cmd = "cd #{BIN_DIR} && termux-chroot #{base_cmd}"
+  end
+
+  exec_silent("#{cmd} > #{log_file("loclx")} 2>&1 &")
+  sleep termux? ? 10 : 6
+
+  20.times do
     url = `grep -o "https://[^ ]*loclx.io" #{log_file("loclx")} 2>/dev/null | head -1`.strip
     return url unless url.empty?
     sleep 1
   end
-  
+
   nil
 end
 
+
 def start_all_tunnels(port, config)
-  warn "Starting all tunnels (this may take ~30 seconds)..." if termux?
-  
+  warn "Starting all tunnels (may take ~30s on Termux)..." if termux?
+
   results = {}
-  
-  # Start ngrok if binary exists
-  if File.exist?(TOOLS[:ngrok])
-    results[:ngrok] = start_ngrok(port, config)
-  else
-    warn "Ngrok binary not found, skipping..."
-    results[:ngrok] = nil
-  end
-  
-  # Start cloudflare if binary exists
-  if File.exist?(TOOLS[:cloudflared])
-    results[:cloudflare] = start_cloudflare(port)
-  else
-    warn "Cloudflared binary not found, skipping..."
-    results[:cloudflare] = nil
-  end
-  
-  # Start loclx if binary exists
-  if File.exist?(TOOLS[:loclx])
-    results[:loclx] = start_loclx(port, config)
-  else
-    warn "Loclx binary not found, skipping..."
-    results[:loclx] = nil
-  end
-  
+
+  results[:ngrok] = File.exist?(TOOLS[:ngrok]) ? start_ngrok(port, config) : nil
+  warn "Ngrok binary not found, skipping..." unless File.exist?(TOOLS[:ngrok])
+
+  results[:cloudflare] = File.exist?(TOOLS[:cloudflared]) ? start_cloudflare(port) : nil
+  warn "Cloudflared binary not found, skipping..." unless File.exist?(TOOLS[:cloudflared])
+
+  results[:loclx] = File.exist?(TOOLS[:loclx]) ? start_loclx(port, config) : nil
+  warn "Loclx binary not found, skipping..." unless File.exist?(TOOLS[:loclx])
+
   results
 end
-
+  
 # ------------------ CLI INTERFACE ------------------
 
 def select_server
