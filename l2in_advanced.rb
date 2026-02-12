@@ -51,14 +51,14 @@ RESET  = "\033[0m"
 
 # ------------------ LOGO ------------------
 
-LOGO = """
+LOGO = <<~LOGO_TEXT
 #{RED}
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀ 
 #{YELLOW}▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░ 
 #{GREEN}▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
 #{BLUE}                                      [v#{VERSION} Advanced - API Support]
 #{RESET}
-"""
+LOGO_TEXT
 
 # ------------------ CONFIGURATION MANAGER ------------------
 
@@ -458,7 +458,7 @@ def start_ngrok(port, config)
 
   # Try to get URL from API
   10.times do
-    url = `curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o "https://[^\"]*ngrok[^\"]*"`.strip
+    url = `curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o "https://[^\\"]*ngrok[^\\"]*"`.strip
     return url unless url.empty?
     sleep 1
   end
@@ -660,7 +660,8 @@ end
 def show_about
   system("clear")
   puts LOGO
-  puts """
+  puts <<~ABOUT_TEXT
+
 #{RED}[Tool Name]   #{CYAN}: Local2Internet v#{VERSION}
 #{RED}[Description] #{CYAN}: Advanced LocalHost Exposing Tool
 #{RED}[Author]      #{CYAN}: KasRoudra
@@ -673,7 +674,7 @@ def show_about
               #{CYAN}  • Auto Port Detection
               #{CYAN}  • Multi-Protocol Server (Python/PHP/NodeJS)
 #{RESET}
-"""
+  ABOUT_TEXT
   ask "Press ENTER to continue..."
   gets
 end
@@ -681,7 +682,8 @@ end
 def show_help
   system("clear")
   puts LOGO
-  puts """
+  puts <<~HELP_TEXT
+
 #{CYAN}═══════════════════════════════════════════════════════════
                         HELP GUIDE
 ═══════════════════════════════════════════════════════════#{RESET}
@@ -715,7 +717,7 @@ def show_help
   • Any system with Ruby support
 
 #{CYAN}═══════════════════════════════════════════════════════════#{RESET}
-"""
+  HELP_TEXT
   ask "\nPress ENTER to continue..."
   gets
 end
