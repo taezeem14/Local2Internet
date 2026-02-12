@@ -1,63 +1,142 @@
-<h1 align="center">Local2Internet</h1>
+# 🌍 Local2Internet
 
 <p align="center">
-   <img src="https://img.shields.io/badge/Author-KasRoudra-magenta?style=flat-square">
-   <img src="https://img.shields.io/badge/Open%20Source-Yes-orange?style=flat-square">
-   <img src="https://img.shields.io/badge/Maintained-Yes-cyan?style=flat-square">
-   <img src="https://img.shields.io/badge/Written%20In-Ruby-blue?style=flat-square">
+  <img src="https://img.shields.io/badge/Original%20Author-KasRoudra-magenta?style=flat-square">
+  <img src="https://img.shields.io/badge/Maintainer-Muhammad%20Taezeem%20Tariq%20Matta-green?style=flat-square">
+  <img src="https://img.shields.io/badge/Open%20Source-Yes-orange?style=flat-square">
+  <img src="https://img.shields.io/badge/Language-Ruby-blue?style=flat-square">
+  <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square">
 </p>
 
-### [+] Description :
-***Local2Internet is used to expose locally hosted website into all over internet.***
+---
 
-### [+] Installation
+## 🚀 What is Local2Internet?
 
-```
-apt install ruby python nodejs php wget curl unzip -y
+**Local2Internet** is an open-source tool that exposes your locally hosted website to the public internet using powerful tunneling services.
+
+Perfect for:
+
+* 🧪 Development & testing
+* 🎯 Demos & presentations
+* 🌐 Sharing local projects instantly
+
+---
+
+## ✨ Features
+
+### 🖥️ Hosting Engines
+
+* 🐍 Python HTTP Server
+* 🐘 PHP Built-in Server
+* 🟢 Node.js (`http-server`)
+
+### 🌍 Tunneling Providers
+
+* 🔗 Ngrok
+* ☁️ Cloudflare Tunnel
+* 🌐 Loclx
+
+### ⚙️ Core Capabilities
+
+* 📁 Custom directory hosting
+* 🔢 Custom port selection
+* 🧠 Automatic dependency handling
+* 📊 Process & log management
+* 🧩 Modular architecture
+* 💻 Linux & Termux support
+
+---
+
+## 🛠️ Installation
+
+### 1️⃣ Install Dependencies
+
+```bash
+apt install ruby python3 nodejs php wget curl unzip -y
 ```
 
-```
-npm install http-server -g
+### 2️⃣ Install Node HTTP Server
+
+```bash
+npm install -g http-server
 ```
 
-```
+### 3️⃣ Clone the Repository
+
+```bash
 git clone https://github.com/KasRoudra/Local2Internet
 ```
 
-```
+### 4️⃣ Enter the Project Directory
+
+```bash
 cd Local2Internet
 ```
 
-```
+### 5️⃣ Run the Tool
+
+```bash
 ruby l2in.rb
 ```
 
-### On linux, try `sudo ruby l2in.rb` on first run
+---
 
-### Or, Use Single Command
+## 🧑‍💻 First Run on Linux
 
+If required, run with elevated privileges:
+
+```bash
+sudo ruby l2in.rb
 ```
-apt install wget curl unzip php ruby python nodejs -y && npm install http-server -g && git clone https://github.com/KasRoudra/Local2Internet && cd Local2Internet && chmod +x l2in.rb && ruby l2in.rb
+
+---
+
+## ⚡ One-Line Setup
+
+```bash
+apt install ruby python3 nodejs php wget curl unzip -y && \
+npm install -g http-server && \
+git clone https://github.com/KasRoudra/Local2Internet && \
+cd Local2Internet && \
+chmod +x l2in.rb && \
+ruby l2in.rb
 ```
 
-### Preview:
+---
+
+## 📖 Usage Guide
+
+1. 📂 Enter the directory containing your website files.
+2. 🖥️ Choose a hosting engine (Python / PHP / Node.js).
+3. 🔢 Select a port (or use the default).
+4. 🌍 Choose a tunneling provider.
+5. 🔗 Use the generated public URL to access your site from anywhere.
+
+---
+
+## 🖼️ Preview
 
 <img src="https://github.com/KasRoudra/Local2Internet/raw/main/main.jpg">
 
-## Usage:
+---
 
- - Enter the directory where website files are available.
- - Choose a hosting protocol.
- - Enter a port.
- - Use the generated link(s)!
+## 👥 Authors & Credits
 
-## Features:
- - Triple Tunneling
- - Triple hosting protocol
- - Custom directory
- - Custom port
+* 👑 Original Author: **KasRoudra**
+* 🧠 Maintainer & Contributor: **Muhammad Taezeem Tariq Matta**
 
-### [+] Find me on 
-<a href="mailto://kasroudrakrd@gmail.com" target="_blank"><img src="https://img.shields.io/badge/Email-kasroudrakrd@gmail.com-blue?style=for-the-badge&logo=gmail"></a>
+---
 
-<a href="https://m.me/KasRoudra" target="_blank"><img src="https://img.shields.io/badge/Messenger-KasRoudra-blue?style=for-the-badge&logo=messenger"></a>
+## 📬 Contact
+
+### Original Author
+
+* 📧 Email: [kasroudrakrd@gmail.com](mailto:kasroudrakrd@gmail.com)
+* 💬 Messenger: [https://m.me/KasRoudra](https://m.me/KasRoudra)
+
+---
+
+## ⭐ Open Source Spirit
+
+Local2Internet is an open-source project. Contributions, improvements, and ideas are welcome.
+If you like this project, consider giving it a ⭐ on GitHub.
