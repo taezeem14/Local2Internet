@@ -326,9 +326,30 @@ def start_all_tunnels(port)
   warn "Starting all tunnels (this may take a moment)..." if termux?
   
   results = {}
-  results[:ngrok] = start_ngrok(port)
-  results[:cloudflare] = start_cloudflare(port)
-  results[:loclx] = start_loclx(port)
+  
+  # Only start ngrok if binary exists
+  if File.exist?(TOOLS[:ngrok])
+    results[:ngrok] = start_ngrok(port)
+  else
+    warn "Ngrok binary not found, skipping..."
+    results[:ngrok] = nil
+  end
+  
+  # Only start cloudflare if binary exists
+  if File.exist?(TOOLS[:cloudflared])
+    results[:cloudflare] = start_cloudflare(port)
+  else
+    warn "Cloudflared binary not found, skipping..."
+    results[:cloudflare] = nil
+  end
+  
+  # Only start loclx if binary exists
+  if File.exist?(TOOLS[:loclx])
+    results[:loclx] = start_loclx(port)
+  else
+    warn "Loclx binary not found, skipping..."
+    results[:loclx] = nil
+  end
   
   results
 end
