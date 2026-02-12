@@ -1,22 +1,23 @@
 #!/usr/bin/env ruby
 # ==========================================================
-# Local2Internet v4 - Professional Open-Source Edition
+# Local2Internet v4.1 - Advanced Edition
 #
 # Description:
 #   Expose a local directory to the internet using
 #   Python, PHP, or NodeJS with tunneling via:
-#   - Ngrok
-#   - Cloudflare Tunnel
-#   - Loclx
+#   - Ngrok (with API key support)
+#   - Cloudflare Tunnel (Termux compatible)
+#   - Loclx (with API key support)
 #
 # Original Author  : KasRoudra
-# Contributor      : Muhammad Taezeem Tariq Matta
-# Repository       : Open Source
+# Enhanced By      : Muhammad Taezeem Tariq Matta
+# Repository       : github.com/Taezeem14/Local2Internet
 # License          : MIT
 # ==========================================================
 
 require 'fileutils'
 require 'json'
+require 'yaml'
 
 # ------------------ CONFIGURATION ------------------
 
@@ -24,6 +25,7 @@ HOME = ENV["HOME"]
 BASE_DIR = "#{HOME}/.local2internet"
 LOG_DIR  = "#{BASE_DIR}/logs"
 BIN_DIR  = "#{BASE_DIR}/bin"
+CONFIG_FILE = "#{BASE_DIR}/config.yml"
 
 TOOLS = {
   ngrok: "#{BIN_DIR}/ngrok",
@@ -33,6 +35,7 @@ TOOLS = {
 
 DEPENDENCIES = %w[python3 php wget unzip curl]
 DEFAULT_PORT = 8888
+VERSION = "4.1"
 
 # ------------------ COLORS ------------------
 
@@ -53,9 +56,48 @@ LOGO = """
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀ 
 #{YELLOW}▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░ 
 #{GREEN}▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-#{BLUE}                                                    [v4 Enhanced - FIXED]
+#{BLUE}                                      [v#{VERSION} Advanced - API Support]
 #{RESET}
 """
+
+# ------------------ CONFIGURATION MANAGER ------------------
+
+class ConfigManager
+  def initialize
+    @config = load_config
+  end
+
+  def load_config
+    if File.exist?(CONFIG_FILE)
+      YAML.load_file(CONFIG_FILE) rescue {}
+    else
+      {}
+    end
+  end
+
+  def save_config
+    FileUtils.mkdir_p(File.dirname(CONFIG_FILE))
+    File.write(CONFIG_FILE, @config.to_yaml)
+  end
+
+  def get(key)
+    @config[key.to_s]
+  end
+
+  def set(key, value)
+    @config[key.to_s] = value
+    save_config
+  end
+
+  def delete(key)
+    @config.delete(key.to_s)
+    save_config
+  end
+
+  def has?(key)
+    @config.key?(key.to_s)
+  end
+end
 
 # ------------------ UTILITIES ------------------
 
@@ -102,7 +144,11 @@ def ask(msg)
 end
 
 def termux?
-  Dir.exist?("/data/data/com.termux/files/home")
+  @is_termux ||= Dir.exist?("/data/data/com.termux/files/home")
+end
+
+def proot_available?
+  command_exists?("proot")
 end
 
 # ------------------ CLEANUP ------------------
@@ -118,36 +164,41 @@ end
 # ------------------ DEPENDENCY MANAGER ------------------
 
 def check_package(pkg)
-  `dpkg -l | grep -o #{pkg}`.include?(pkg)
+  `dpkg -l 2>/dev/null | grep -o #{pkg}`.include?(pkg) ||
+  `pkg list-installed 2>/dev/null | grep -o #{pkg}`.include?(pkg)
 end
 
 def install_dependencies
   info "Checking system dependencies..."
 
+  pkg_cmd = termux? ? "pkg" : "apt"
+
   DEPENDENCIES.each do |dep|
     pkg_name = dep == "python3" ? "python" : dep
     
-    unless check_package(pkg_name)
+    unless check_package(pkg_name) || command_exists?(dep)
       info "Installing #{dep}..."
-      exec_silent("apt install #{dep} -y") || abort_with("Failed to install #{dep}")
+      exec_silent("#{pkg_cmd} install #{dep} -y") || abort_with("Failed to install #{dep}")
     end
   end
 
   # Check NodeJS separately
-  unless check_package("node")
+  unless check_package("nodejs") || command_exists?("node")
     info "Installing NodeJS..."
-    exec_silent("apt install nodejs -y") || abort_with("Failed to install nodejs")
+    exec_silent("#{pkg_cmd} install nodejs -y") || abort_with("Failed to install nodejs")
   end
 
   # Install http-server globally
-  unless `npm list -g --depth=0 2>/dev/null | grep -o http-server`.include?("http-server")
-    info "Installing Node http-server..."
-    exec_silent("npm install -g http-server") || abort_with("Failed to install http-server")
+  if command_exists?("npm")
+    unless `npm list -g --depth=0 2>/dev/null | grep -o http-server`.include?("http-server")
+      info "Installing Node http-server..."
+      exec_silent("npm install -g http-server") || warn("Failed to install http-server")
+    end
   end
 
-  # Termux specific: proot
-  if termux? && !command_exists?("proot")
-    info "Installing proot (Termux)..."
+  # Termux specific: proot for compatibility
+  if termux? && !proot_available?
+    info "Installing proot for Termux compatibility..."
     exec_silent("pkg install proot -y")
   end
 end
@@ -160,10 +211,10 @@ def download_ngrok
   info "Downloading ngrok..."
 
   url = case arch
-  when /arm(?!64)/ then "https://github.com/KasRoudra/files/raw/main/ngrok/ngrok-stable-linux-arm.zip"
-  when /aarch64|arm64/ then "https://github.com/KasRoudra/files/raw/main/ngrok/ngrok-stable-linux-arm64.tgz"
-  when /x86_64/ then "https://github.com/KasRoudra/files/raw/main/ngrok/ngrok-stable-linux-amd64.zip"
-  else "https://github.com/KasRoudra/files/raw/main/ngrok/ngrok-stable-linux-386.zip"
+  when /arm(?!64)/ then "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm.tgz"
+  when /aarch64|arm64/ then "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm64.tgz"
+  when /x86_64/ then "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz"
+  else "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-386.tgz"
   end
 
   tmp = "#{BASE_DIR}/ngrok.tmp"
@@ -172,16 +223,9 @@ def download_ngrok
     abort_with("Failed to download ngrok - check your internet connection")
   end
 
-  if url.include?(".tgz")
-    unless exec_silent("tar -xzf #{tmp} -C #{BIN_DIR}")
-      File.delete(tmp) if File.exist?(tmp)
-      abort_with("Failed to extract ngrok")
-    end
-  else
-    unless exec_silent("unzip -q #{tmp} -d #{BIN_DIR}")
-      File.delete(tmp) if File.exist?(tmp)
-      abort_with("Failed to extract ngrok")
-    end
+  unless exec_silent("tar -xzf #{tmp} -C #{BIN_DIR}")
+    File.delete(tmp) if File.exist?(tmp)
+    abort_with("Failed to extract ngrok")
   end
 
   exec_silent("chmod +x #{TOOLS[:ngrok]}")
@@ -194,16 +238,27 @@ def download_cloudflared
 
   info "Downloading cloudflared..."
 
-  url = case arch
-  when /arm(?!64)/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm"
-  when /aarch64|arm64/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
-  when /x86_64/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
-  else "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-386"
+  # Termux ARM64 requires special handling
+  if termux? && arch.match?(/aarch64|arm64/)
+    url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
+  else
+    url = case arch
+    when /arm(?!64)/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm"
+    when /aarch64|arm64/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
+    when /x86_64/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+    else "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-386"
+    end
   end
 
   if exec_silent("wget -q --show-progress #{url} -O #{TOOLS[:cloudflared]}")
     exec_silent("chmod +x #{TOOLS[:cloudflared]}")
-    success "Cloudflared installed!"
+    
+    # Termux: Additional proot wrapper if needed
+    if termux?
+      success "Cloudflared installed! (Termux mode: will use proot wrapper)"
+    else
+      success "Cloudflared installed!"
+    end
   else
     warn "Failed to download cloudflared (non-critical)"
   end
@@ -244,6 +299,112 @@ def download_tools
   download_loclx
 end
 
+# ------------------ API KEY MANAGER ------------------
+
+def manage_api_keys(config)
+  loop do
+    system("clear")
+    puts LOGO
+    puts "\n#{YELLOW}╔════════════════════════════════════════╗#{RESET}"
+    puts "#{YELLOW}║         API KEY MANAGEMENT             ║#{RESET}"
+    puts "#{YELLOW}╚════════════════════════════════════════╝#{RESET}\n"
+    
+    puts "1) Set Ngrok Authtoken"
+    puts "2) Set Loclx Access Token"
+    puts "3) View Current Keys"
+    puts "4) Remove Keys"
+    puts "0) Back to Main Menu"
+    
+    ask "\nChoice: "
+    choice = gets.chomp.strip
+
+    case choice
+    when "1"
+      ask "\nEnter Ngrok authtoken (from https://dashboard.ngrok.com): "
+      token = gets.chomp.strip
+      
+      if token.empty?
+        warn "Token cannot be empty!"
+        sleep 2
+        next
+      end
+      
+      # Configure ngrok with authtoken
+      if exec_silent("#{TOOLS[:ngrok]} config add-authtoken #{token}")
+        config.set('ngrok_token', token)
+        success "Ngrok authtoken saved and configured!"
+      else
+        warn "Failed to configure ngrok authtoken"
+      end
+      sleep 2
+      
+    when "2"
+      ask "\nEnter Loclx access token (from https://localxpose.io): "
+      token = gets.chomp.strip
+      
+      if token.empty?
+        warn "Token cannot be empty!"
+        sleep 2
+        next
+      end
+      
+      config.set('loclx_token', token)
+      success "Loclx access token saved!"
+      sleep 2
+      
+    when "3"
+      puts "\n#{CYAN}Current API Keys:#{RESET}"
+      puts "━" * 40
+      
+      if config.has?('ngrok_token')
+        puts "#{GREEN}[✓]#{RESET} Ngrok: #{config.get('ngrok_token')[0..15]}***"
+      else
+        puts "#{RED}[✗]#{RESET} Ngrok: Not configured"
+      end
+      
+      if config.has?('loclx_token')
+        puts "#{GREEN}[✓]#{RESET} Loclx: #{config.get('loclx_token')[0..15]}***"
+      else
+        puts "#{RED}[✗]#{RESET} Loclx: Not configured"
+      end
+      
+      puts "\n#{YELLOW}Note: API keys enable premium features and remove rate limits#{RESET}"
+      ask "\nPress ENTER to continue..."
+      gets
+      
+    when "4"
+      puts "\n#{YELLOW}Remove which key?#{RESET}"
+      puts "1) Ngrok"
+      puts "2) Loclx"
+      puts "3) Both"
+      puts "0) Cancel"
+      
+      ask "\nChoice: "
+      remove_choice = gets.chomp.strip
+      
+      case remove_choice
+      when "1"
+        config.delete('ngrok_token')
+        success "Ngrok token removed!"
+      when "2"
+        config.delete('loclx_token')
+        success "Loclx token removed!"
+      when "3"
+        config.delete('ngrok_token')
+        config.delete('loclx_token')
+        success "All tokens removed!"
+      end
+      sleep 2
+      
+    when "0"
+      break
+    else
+      warn "Invalid choice!"
+      sleep 2
+    end
+  end
+end
+
 # ------------------ SERVER MANAGER ------------------
 
 def start_server(path, port, mode)
@@ -263,31 +424,46 @@ def start_server(path, port, mode)
     abort_with("Invalid server mode")
   end
 
-  sleep 2
+  sleep 3
 
   # Verify server started
-  status = `curl -s --head -w %{http_code} 127.0.0.1:#{port} -o /dev/null 2>&1`.strip
-  if status.include?("000") || status.empty?
-    abort_with("Local server failed to start!")
+  5.times do
+    status = `curl -s --head -w %{http_code} 127.0.0.1:#{port} -o /dev/null 2>&1`.strip
+    unless status.include?("000") || status.empty?
+      success "Server running at http://127.0.0.1:#{port}"
+      return true
+    end
+    sleep 1
   end
-
-  success "Server running at http://127.0.0.1:#{port}"
+  
+  abort_with("Local server failed to start! Check if port #{port} is already in use.")
 end
 
 # ------------------ TUNNEL MANAGER ------------------
 
-def start_ngrok(port)
+def start_ngrok(port, config)
   info "Starting Ngrok tunnel..."
   
-  cmd = termux? ? 
-    "cd #{BIN_DIR} && termux-chroot ./ngrok http #{port} &" :
+  # Use authtoken if configured
+  authtoken_configured = config.has?('ngrok_token')
+  
+  cmd = if termux? && proot_available?
+    "cd #{BIN_DIR} && termux-chroot ./ngrok http #{port} > /dev/null 2>&1 &"
+  else
     "#{TOOLS[:ngrok]} http #{port} > /dev/null 2>&1 &"
+  end
   
   exec_silent(cmd)
-  sleep 5
+  sleep 6
 
-  url = `curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o "https://[^\"]*ngrok.io"`.strip
-  url.empty? ? nil : url
+  # Try to get URL from API
+  10.times do
+    url = `curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o "https://[^\"]*ngrok[^\"]*"`.strip
+    return url unless url.empty?
+    sleep 1
+  end
+  
+  nil
 end
 
 def start_cloudflare(port)
@@ -295,47 +471,73 @@ def start_cloudflare(port)
   
   File.delete(log_file("cloudflare")) if File.exist?(log_file("cloudflare"))
   
-  cmd = termux? ?
-    "cd #{BIN_DIR} && termux-chroot ./cloudflared tunnel -url 127.0.0.1:#{port} --logfile #{log_file("cloudflare")} &" :
-    "#{TOOLS[:cloudflared]} tunnel -url 127.0.0.1:#{port} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &"
+  cmd = if termux? && proot_available?
+    "cd #{BIN_DIR} && termux-chroot ./cloudflared tunnel --url http://127.0.0.1:#{port} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &"
+  elsif termux?
+    # Fallback for Termux without proot
+    "#{TOOLS[:cloudflared]} tunnel --url http://127.0.0.1:#{port} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &"
+  else
+    "#{TOOLS[:cloudflared]} tunnel --url http://127.0.0.1:#{port} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &"
+  end
   
   exec_silent(cmd)
-  sleep 6
+  sleep 8
 
-  url = `grep -o "https://[^ ]*trycloudflare.com" #{log_file("cloudflare")} 2>/dev/null`.strip
-  url.empty? ? nil : url
+  # Try multiple times to get URL from log
+  15.times do
+    url = `grep -o "https://[^ ]*trycloudflare.com" #{log_file("cloudflare")} 2>/dev/null | head -1`.strip
+    return url unless url.empty?
+    sleep 1
+  end
+  
+  nil
 end
 
-def start_loclx(port)
+def start_loclx(port, config)
   info "Starting Loclx tunnel..."
   
   File.delete(log_file("loclx")) if File.exist?(log_file("loclx"))
   
-  cmd = termux? ?
-    "cd #{BIN_DIR} && termux-chroot ./loclx tunnel http --to :#{port} > #{log_file("loclx")} 2>&1 &" :
-    "#{TOOLS[:loclx]} tunnel http --to :#{port} > #{log_file("loclx")} 2>&1 &"
+  # Build command with access token if available
+  base_cmd = "#{TOOLS[:loclx]} tunnel http --to :#{port}"
+  
+  if config.has?('loclx_token')
+    base_cmd += " --token #{config.get('loclx_token')}"
+  end
+  
+  cmd = if termux? && proot_available?
+    "cd #{BIN_DIR} && termux-chroot ./loclx tunnel http --to :#{port} > #{log_file("loclx")} 2>&1 &"
+  else
+    "#{base_cmd} > #{log_file("loclx")} 2>&1 &"
+  end
   
   exec_silent(cmd)
-  sleep 6
+  sleep 8
 
-  url = `grep -o "https://[^ ]*loclx.io" #{log_file("loclx")} 2>/dev/null`.strip
-  url.empty? ? nil : url
+  # Try to get URL from log
+  15.times do
+    url = `grep -o "https://[^ ]*loclx.io" #{log_file("loclx")} 2>/dev/null | head -1`.strip
+    return url unless url.empty?
+    sleep 1
+  end
+  
+  nil
 end
 
-def start_all_tunnels(port)
-  warn "Starting all tunnels (this may take a moment)..." if termux?
+def start_all_tunnels(port, config)
+  warn "Starting all tunnels (this may take ~30 seconds)..." if termux?
   
   results = {}
   
-  # Only start ngrok if binary exists
+  # Start ngrok if binary exists
   if File.exist?(TOOLS[:ngrok])
-    results[:ngrok] = start_ngrok(port)
+    results[:ngrok] = start_ngrok(port, config)
   else
     warn "Ngrok binary not found, skipping..."
     results[:ngrok] = nil
   end
   
-  # Only start cloudflare if binary exists
+  # Start cloudflare if binary exists
   if File.exist?(TOOLS[:cloudflared])
     results[:cloudflare] = start_cloudflare(port)
   else
@@ -343,9 +545,9 @@ def start_all_tunnels(port)
     results[:cloudflare] = nil
   end
   
-  # Only start loclx if binary exists
+  # Start loclx if binary exists
   if File.exist?(TOOLS[:loclx])
-    results[:loclx] = start_loclx(port)
+    results[:loclx] = start_loclx(port, config)
   else
     warn "Loclx binary not found, skipping..."
     results[:loclx] = nil
@@ -358,7 +560,7 @@ end
 
 def select_server
   puts "\n#{YELLOW}Select hosting protocol:#{RESET}"
-  puts "1) Python (http.server)"
+  puts "1) Python (http.server) - Recommended"
   puts "2) PHP (built-in server)"
   puts "3) NodeJS (http-server)"
   ask "Choice [1-3] (default: 1): "
@@ -381,7 +583,6 @@ def get_directory
     ask "Enter directory path to host (or '.' for current): "
     input = gets.chomp.strip
     
-    # Handle empty input
     if input.empty?
       warn "Please enter a valid directory path!"
       next
@@ -395,7 +596,7 @@ def get_directory
       return path
     else
       warn "Directory '#{path}' does not exist!"
-      warn "Please enter a valid absolute or relative path (without 'cd')"
+      warn "Please enter a valid path (e.g., /home/user/mysite or ./mysite)"
     end
   end
 end
@@ -412,6 +613,15 @@ def get_port
     return DEFAULT_PORT
   end
   
+  # Check if port is in use
+  if `lsof -i :#{port_num} 2>/dev/null`.include?("LISTEN")
+    warn "Port #{port_num} is already in use!"
+    ask "Try anyway? (y/N): "
+    choice = gets.chomp.strip.downcase
+    return port_num if choice == 'y'
+    return get_port
+  end
+  
   port_num
 end
 
@@ -424,20 +634,25 @@ def display_results(urls)
   
   urls.each do |service, url|
     if url
-      success "#{service.to_s.capitalize}: #{CYAN}#{url}#{RESET}"
+      success "#{service.to_s.capitalize.ljust(12)}: #{CYAN}#{url}#{RESET}"
       active_count += 1
     else
-      warn "#{service.to_s.capitalize}: Failed to start"
+      warn "#{service.to_s.capitalize.ljust(12)}: Failed to start"
     end
   end
   
   if active_count == 0
     puts "\n#{RED}All tunnels failed to start!#{RESET}"
-    warn "This might be due to network issues or firewall restrictions"
-    warn "You can still access your server locally at the displayed port"
+    warn "Troubleshooting:"
+    warn "• Check your internet connection"
+    warn "• Verify firewall settings"
+    warn "• Try configuring API keys (Menu option 3)"
+    warn "• Check logs in: #{LOG_DIR}"
+    puts "\n#{YELLOW}Server is still accessible locally at the displayed port#{RESET}"
     return false
   else
     puts "\n#{GREEN}#{active_count}/#{urls.size} tunnels active#{RESET}"
+    puts "\n#{CYAN}TIP: Configure API keys for better reliability (Menu option 3)#{RESET}" if active_count < urls.size
     return true
   end
 end
@@ -446,16 +661,62 @@ def show_about
   system("clear")
   puts LOGO
   puts """
-#{RED}[Tool Name]   #{CYAN}: Local2Internet v4
-#{RED}[Version]     #{CYAN}: 4.0 Enhanced (Fixed)
-#{RED}[Description] #{CYAN}: LocalHost Exposing Tool
+#{RED}[Tool Name]   #{CYAN}: Local2Internet v#{VERSION}
+#{RED}[Description] #{CYAN}: Advanced LocalHost Exposing Tool
 #{RED}[Author]      #{CYAN}: KasRoudra
-#{RED}[Contributor] #{CYAN}: Muhammad Taezeem Tariq Matta
-#{RED}[Github]      #{CYAN}: https://github.com/KasRoudra
+#{RED}[Enhanced By] #{CYAN}: Muhammad Taezeem Tariq Matta
+#{RED}[Github]      #{CYAN}: https://github.com/Taezeem14/Local2Internet
 #{RED}[License]     #{CYAN}: MIT Open Source
+#{RED}[Features]    #{CYAN}: • Triple Tunneling (Ngrok, Cloudflare, Loclx)
+              #{CYAN}  • API Key Support
+              #{CYAN}  • Termux Compatible
+              #{CYAN}  • Auto Port Detection
+              #{CYAN}  • Multi-Protocol Server (Python/PHP/NodeJS)
 #{RESET}
 """
   ask "Press ENTER to continue..."
+  gets
+end
+
+def show_help
+  system("clear")
+  puts LOGO
+  puts """
+#{CYAN}═══════════════════════════════════════════════════════════
+                        HELP GUIDE
+═══════════════════════════════════════════════════════════#{RESET}
+
+#{YELLOW}GETTING STARTED:#{RESET}
+  1. Select "Start Server & Tunnels" from main menu
+  2. Enter the directory path you want to host
+  3. Choose your preferred server protocol
+  4. Enter a port number (or use default)
+  5. Wait for tunnels to initialize
+  6. Share the public URLs with others!
+
+#{YELLOW}API KEY CONFIGURATION:#{RESET}
+  • Ngrok: Get authtoken from https://dashboard.ngrok.com
+  • Loclx: Get access token from https://localxpose.io/dashboard
+  
+  Benefits: Remove rate limits, get persistent URLs, priority support
+
+#{YELLOW}TROUBLESHOOTING:#{RESET}
+  • Port in use: Choose a different port
+  • Tunnels fail: Check internet connection, firewall, add API keys
+  • Server fails: Ensure directory has index.html or index.php
+  • Termux issues: Make sure proot is installed (pkg install proot)
+
+#{YELLOW}LOGS LOCATION:#{RESET}
+  #{LOG_DIR}
+
+#{YELLOW}SUPPORTED PLATFORMS:#{RESET}
+  • Linux (Debian, Ubuntu, Arch, Fedora)
+  • Termux (Android)
+  • Any system with Ruby support
+
+#{CYAN}═══════════════════════════════════════════════════════════#{RESET}
+"""
+  ask "\nPress ENTER to continue..."
   gets
 end
 
@@ -477,7 +738,7 @@ end
 
 # ------------------ MAIN PROGRAM ------------------
 
-def main_menu
+def main_menu(config)
   loop do
     system("clear")
     puts LOGO
@@ -485,29 +746,41 @@ def main_menu
     puts "#{YELLOW}║            MAIN MENU                   ║#{RESET}"
     puts "#{YELLOW}╚════════════════════════════════════════╝#{RESET}\n"
     puts "1) Start Server & Tunnels"
-    puts "2) About"
+    puts "2) Manage API Keys"
+    puts "3) Help & Documentation"
+    puts "4) About"
     puts "0) Exit"
+    
+    # Show API key status
+    puts "\n#{CYAN}API Keys Status:#{RESET}"
+    ngrok_status = config.has?('ngrok_token') ? "#{GREEN}Configured#{RESET}" : "#{RED}Not Set#{RESET}"
+    loclx_status = config.has?('loclx_token') ? "#{GREEN}Configured#{RESET}" : "#{RED}Not Set#{RESET}"
+    puts "  Ngrok: #{ngrok_status} | Loclx: #{loclx_status}"
     
     ask "\nChoice: "
     choice = gets.chomp.strip
 
     case choice
     when "1"
-      run_server
+      run_server(config)
     when "2"
+      manage_api_keys(config)
+    when "3"
+      show_help
+    when "4"
       show_about
     when "0"
       cleanup
       puts "\n#{GREEN}Goodbye! 👋#{RESET}\n"
       exit 0
     else
-      warn "Invalid choice! Please select 1, 2, or 0"
+      warn "Invalid choice! Please select 1-4 or 0"
       sleep 2
     end
   end
 end
 
-def run_server
+def run_server(config)
   system("clear")
   puts LOGO
   
@@ -517,13 +790,17 @@ def run_server
   port = get_port
   
   # Enable hotspot reminder for Termux
-  warn "Please enable mobile hotspot if needed..." if termux?
+  if termux?
+    warn "Termux detected!"
+    warn "For best results, enable mobile hotspot or connect to WiFi"
+    sleep 2
+  end
   
   # Start local server
   start_server(path, port, server_mode)
   
   # Start tunnels
-  urls = start_all_tunnels(port)
+  urls = start_all_tunnels(port, config)
   
   # Display results
   has_urls = display_results(urls)
@@ -543,9 +820,33 @@ begin
   setup_signal_handlers
   cleanup # Clean any previous instances
   ensure_dirs
+  
+  # Initialize config manager
+  config = ConfigManager.new
+  
+  # Install dependencies and tools
   install_dependencies
   download_tools
-  main_menu
+  
+  # Show welcome message on first run
+  unless config.has?('first_run_done')
+    system("clear")
+    puts LOGO
+    puts "\n#{GREEN}╔════════════════════════════════════════╗#{RESET}"
+    puts "#{GREEN}║     WELCOME TO LOCAL2INTERNET v#{VERSION}   ║#{RESET}"
+    puts "#{GREEN}╚════════════════════════════════════════╝#{RESET}\n"
+    puts "#{CYAN}First-time setup complete!#{RESET}"
+    puts "#{YELLOW}• All dependencies installed#{RESET}"
+    puts "#{YELLOW}• Tunneling tools downloaded#{RESET}"
+    puts "#{YELLOW}• Ready to expose your localhost!#{RESET}\n"
+    puts "#{CYAN}TIP: Configure API keys for premium features (Menu option 2)#{RESET}\n"
+    config.set('first_run_done', true)
+    sleep 3
+  end
+  
+  # Start main menu
+  main_menu(config)
+  
 rescue Exception => e
   puts "\n#{RED}[FATAL ERROR] #{e.message}#{RESET}"
   puts e.backtrace.join("\n") if ENV["DEBUG"]
