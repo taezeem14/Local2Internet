@@ -449,10 +449,10 @@ def start_ngrok(port, config)
   authtoken_configured = config.has?('ngrok_token')
   
 cmd = if termux? && proot_available?
-  "cd #{BIN_DIR} && termux-chroot #{base_cmd} > #{log_file("loclx")} 2>&1 &"
-else
-  "#{base_cmd} > #{log_file("loclx")} 2>&1 &"
-end
+    "cd #{BIN_DIR} && termux-chroot ./ngrok http #{port} > /dev/null 2>&1 &"
+  else
+    "#{TOOLS[:ngrok]} http #{port} > /dev/null 2>&1 &"
+  end
   
   exec_silent(cmd)
   sleep 6
