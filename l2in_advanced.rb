@@ -480,7 +480,6 @@ def start_ngrok(port, config)
   nil
 end
 
-
 def start_cloudflare(port)
   info "Starting Cloudflare tunnel..."
 
@@ -493,13 +492,11 @@ def start_cloudflare(port)
     cmd = "cd #{BIN_DIR} && termux-chroot #{base_cmd}"
   end
 
-  20.times do
-  url = `cat #{log_file("cloudflare")} 2>/dev/null | grep -o "https://[^ ]*trycloudflare.com" | head -1`.strip
-  return url unless url.empty?
-  sleep 1
-end
+  # START CLOUDFARE PROCESS
+  exec_silent("#{cmd} > #{log_file("cloudflare")} 2>&1 &")
   sleep termux? ? 12 : 7
 
+  # Try multiple times to extract URL from logs
   20.times do
     url = `grep -o "https://[^ ]*trycloudflare.com" #{log_file("cloudflare")} 2>/dev/null | head -1`.strip
     return url unless url.empty?
@@ -508,7 +505,6 @@ end
 
   nil
 end
-
 
 def start_loclx(port, config)
   info "Starting Loclx tunnel..."
