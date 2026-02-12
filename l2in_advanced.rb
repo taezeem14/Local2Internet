@@ -444,8 +444,6 @@ end
 
 # ------------------ TUNNEL MANAGER ------------------
 
-# ------------------ TUNNEL MANAGER (GOD MODE) ------------------
-
 def start_ngrok(port, config)
   info "Starting Ngrok tunnel..."
 
@@ -495,7 +493,11 @@ def start_cloudflare(port)
     cmd = "cd #{BIN_DIR} && termux-chroot #{base_cmd}"
   end
 
-  exec_silent("#{cmd} --logfile #{log_file("cloudflare")} > /dev/null 2>&1 &")
+  20.times do
+  url = `cat #{log_file("cloudflare")} 2>/dev/null | grep -o "https://[^ ]*trycloudflare.com" | head -1`.strip
+  return url unless url.empty?
+  sleep 1
+end
   sleep termux? ? 12 : 7
 
   20.times do
@@ -516,7 +518,7 @@ def start_loclx(port, config)
   base_cmd = "#{TOOLS[:loclx]} tunnel http --to :#{port}"
 
   if config.has?('loclx_token')
-    base_cmd += " --token #{config.get('loclx_token')}"
+    base_cmd += " --token=#{config.get('loclx_token')}"
   else
     warn "Loclx token not configured (may be limited)"
   end
@@ -825,6 +827,11 @@ begin
   
   # Initialize config manager
   config = ConfigManager.new
+
+  if config.has?('ngrok_token')
+  token = config.get('ngrok_token')
+  exec_silent("#{TOOLS[:ngrok]} config add-authtoken #{token}")
+end
   
   # Install dependencies and tools
   install_dependencies
