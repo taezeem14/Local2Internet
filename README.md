@@ -43,55 +43,83 @@ Perfect for:
 * 🧠 Automatic dependency handling
 * 📊 Process & log management
 * 🧩 Modular architecture
-* 💻 Linux & Termux support
+* 💻 Linux, Termux & Windows support
 
 ---
 
 ## 🛠️ Installation
 
-### 1️⃣ Install Dependencies
+### 1️⃣ Linux / Termux
+
+#### Install Dependencies
 
 ```bash
 apt install ruby python3 nodejs php wget curl unzip -y
 ```
 
-### 2️⃣ Install Node HTTP Server
+#### Install Node HTTP Server
 
 ```bash
 npm install -g http-server
 ```
 
-### 3️⃣ Clone the Repository
+#### Clone the Repository
 
 ```bash
-git clone https://github.com/KasRoudra/Local2Internet
+git clone https://github.com/Taezeem14/Local2Internet
 ```
 
-### 4️⃣ Enter the Project Directory
+#### Enter the Project Directory
 
 ```bash
 cd Local2Internet
 ```
 
-### 5️⃣ Run the Tool
+#### Run the Tool
 
 ```bash
 ruby l2in.rb
 ```
 
----
+### 2️⃣ Windows (PowerShell)
 
-## 🧑‍💻 First Run on Linux
+#### Install Dependencies
 
-If required, run with elevated privileges:
+```powershell
+# Install Ruby
+choco install ruby -y
+# Install Python
+choco install python -y
+# Install Node.js
+choco install nodejs -y
+# Install PHP
+choco install php -y
+# Install Wget & Curl
+choco install wget curl -y
+# Install Unzip
+choco install unzip -y
+```
 
-```bash
-sudo ruby l2in.rb
+#### Install Node HTTP Server
+
+```powershell
+npm install -g http-server
+```
+
+#### Clone & Run
+
+```powershell
+git clone https://github.com/Taezeem14/Local2Internet
+cd Local2Internet
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\Local2Internet.ps1
 ```
 
 ---
 
 ## ⚡ One-Line Setup
+
+### Linux / Termux
 
 ```bash
 apt install ruby python3 nodejs php wget curl unzip -y && \
@@ -100,6 +128,12 @@ git clone https://github.com/KasRoudra/Local2Internet && \
 cd Local2Internet && \
 chmod +x l2in.rb && \
 ruby l2in.rb
+```
+
+### Windows (PowerShell)
+
+```powershell
+choco install ruby python nodejs php wget curl unzip -y; npm install -g http-server; git clone https://github.com/KasRoudra/Local2Internet; cd Local2Internet; Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; .\Local2Internet.ps1
 ```
 
 ---
@@ -133,6 +167,11 @@ ruby l2in.rb
 
 * 📧 Email: [kasroudrakrd@gmail.com](mailto:kasroudrakrd@gmail.com)
 * 💬 Messenger: [https://m.me/KasRoudra](https://m.me/KasRoudra)
+
+### Maintainer
+
+* 📧 Email: [taezeem@taezeem.me](mailto:taezeem@taezeem.me)  <!-- Replace with your actual email -->
+* 💬 Messenger: [https://t.me/Taezeem](https://t.me/Taezeem_14) <!-- Replace with your actual link -->
 
 ---
 
