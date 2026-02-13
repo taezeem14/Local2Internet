@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 # ==========================================================
-# Local2Internet v5.0 ULTIMATE - Next Generation Edition
+# Local2Internet v6.0 ULTIMATE - Next Generation Edition
 #
 # Description:
 #   Professional-grade localhost exposure tool with advanced
