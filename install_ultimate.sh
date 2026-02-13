@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =========================================
-# Local2Internet v4.1 - Advanced Auto Installer
+# Local2Internet v5 - Advanced Auto Installer
 # Platform: Linux / Termux
 # Author: Muhammad Taezeem Tariq Matta
 # =========================================
@@ -27,7 +27,7 @@ echo -e "${RED}
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀
 ${YELLOW}▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░
 ${GREEN}▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-${BLUE}                                      [Auto Installer v4.1 Advanced]
+${BLUE}                                      [Auto Installer v5 Ultimate]
 ${RESET}"
 
 info "Starting Local2Internet Advanced installation..."
@@ -280,7 +280,7 @@ if [ -d "$INSTALL_DIR" ]; then
         echo ""
         info "To run Local2Internet:"
         echo -e "  ${YELLOW}cd $INSTALL_DIR${RESET}"
-        echo -e "  ${YELLOW}./l2in_advanced.rb${RESET}"
+        echo -e "  ${YELLOW}./l2in_ultimate.rb${RESET}"
         echo ""
         exit 0
     fi
@@ -294,7 +294,7 @@ echo ""
 
 # Make executables
 info "Setting permissions..."
-chmod +x "$INSTALL_DIR/l2in_advanced.rb" 2>/dev/null || chmod +x "$INSTALL_DIR/l2in.rb" || error "Failed to set executable permission"
+chmod +x "$INSTALL_DIR/l2in_ultimate.rb" 2>/dev/null || chmod +x "$INSTALL_DIR/l2in.rb" || error "Failed to set executable permission"
 success "Permissions set!"
 
 echo ""
@@ -304,8 +304,8 @@ if [ "$PLATFORM" != "termux" ]; then
     read -p "Create system-wide command 'l2in'? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if [ -f "$INSTALL_DIR/l2in_advanced.rb" ]; then
-            SCRIPT_NAME="l2in_advanced.rb"
+        if [ -f "$INSTALL_DIR/l2in_ultimate.rb" ]; then
+            SCRIPT_NAME="l2in_ultimate.rb"
         else
             SCRIPT_NAME="l2in.rb"
         fi
@@ -325,7 +325,7 @@ if [ "$PLATFORM" = "termux" ]; then
     read -p "Add 'l2in' alias to .bashrc? (Y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        SCRIPT_NAME="l2in_advanced.rb"
+        SCRIPT_NAME="l2in_ultimate.rb"
         [ ! -f "$INSTALL_DIR/$SCRIPT_NAME" ] && SCRIPT_NAME="l2in.rb"
         
         echo "alias l2in='$INSTALL_DIR/$SCRIPT_NAME'" >> ~/.bashrc
@@ -339,11 +339,11 @@ echo -e "${GREEN}║     INSTALLATION SUCCESSFUL! 🎉        ║${RESET}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${RESET}"
 echo ""
 
-success "Local2Internet v4.1 Advanced installed successfully!"
+success "Local2Internet v5 Advanced installed successfully!"
 echo ""
 info "Installation location: ${YELLOW}$INSTALL_DIR${RESET}"
 echo ""
-info "New features in v4.1:"
+info "New features in v5:"
 echo -e "  ${CYAN}• API Key Support (Ngrok & Loclx)${RESET}"
 echo -e "  ${CYAN}• Enhanced Termux Compatibility${RESET}"
 echo -e "  ${CYAN}• Improved Error Handling${RESET}"
@@ -352,7 +352,7 @@ echo -e "  ${CYAN}• Configuration Persistence${RESET}"
 echo ""
 info "To start using Local2Internet:"
 echo -e "  ${YELLOW}cd $INSTALL_DIR${RESET}"
-SCRIPT_NAME="l2in_advanced.rb"
+SCRIPT_NAME="l2in_ultimate.rb"
 [ ! -f "$INSTALL_DIR/$SCRIPT_NAME" ] && SCRIPT_NAME="l2in.rb"
 echo -e "  ${YELLOW}./$SCRIPT_NAME${RESET}"
 echo ""
