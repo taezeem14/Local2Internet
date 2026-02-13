@@ -218,34 +218,33 @@ fi
 
 echo ""
 
-# =========================================
-# Install Loclx (direct download)
-# =========================================
-TOOLS_DIR="$HOME/.local2internet_tools"
-mkdir -p "$TOOLS_DIR"
+# === INSTALL LOCLX ===
+info "Installing Loclx (LocalXpose)..."
 
-info "Installing Loclx..."
+LOC_DIR="$HOME/.local2internet/tools"
+mkdir -p "$LOC_DIR"
 
 ARCH=$(uname -m)
-case $ARCH in
-    x86_64) ARCH="amd64" ;;
-    aarch64|arm64) ARCH="arm64" ;;
-    i386|i686) ARCH="386" ;;
-    *) error "Unsupported architecture for Loclx: $ARCH" ;;
+LOC_URL=""
+
+case "$ARCH" in
+    x86_64) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-amd64.zip" ;;
+    i386|i686) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-386.zip" ;;
+    armv7l|armv6l) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm.zip" ;;
+    aarch64|arm64) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm64.zip" ;;
+    *) warn "Unsupported architecture for Loclx: $ARCH, skipping Loclx install"; LOC_URL="" ;;
 esac
 
-LOCLX_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-$ARCH.zip"
-LOCLX_ZIP="$TOOLS_DIR/loclx.zip"
-LOCLX_BIN="$TOOLS_DIR/loclx"
-
-info "Downloading Loclx ($ARCH)..."
-curl -L "$LOCLX_URL" -o "$LOCLX_ZIP" || error "Failed to download Loclx"
-
-info "Extracting Loclx..."
-unzip -o "$LOCLX_ZIP" -d "$TOOLS_DIR" >/dev/null || error "Failed to extract Loclx"
-chmod +x "$LOCLX_BIN"
-
-success "Loclx installed at $LOCLX_BIN ✅"
+if [ -n "$LOC_URL" ]; then
+    info "Downloading Loclx for $ARCH..."
+    wget -q -L -O "$LOC_DIR/loclx.zip" "$LOC_URL" || error "Failed to download Loclx"
+    info "Extracting Loclx..."
+    unzip -o "$LOC_DIR/loclx.zip" -d "$LOC_DIR" || error "Failed to extract Loclx"
+    chmod +x "$LOC_DIR/loclx"
+    rm "$LOC_DIR/loclx.zip"
+    success "Loclx installed at $LOC_DIR/loclx"
+fi
+# === END LOCLX INSTALL ===
 
 # Install YAML support for Ruby
 info "Checking Ruby YAML support..."
