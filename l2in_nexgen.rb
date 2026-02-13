@@ -721,7 +721,15 @@ class TunnelManager
         
         if data['tunnels'] && data['tunnels'][0]
           url = data['tunnels'][0]['public_url']
-          return url.gsub('http://', 'https://') if url
+          
+          # Check if it's the auth error URL
+          if url && !url.include?('dashboard.ngrok.com')
+            return url.gsub('http://', 'https://')
+          elsif url && url.include?('dashboard.ngrok.com')
+            error "Ngrok authentication required!"
+            warn "Please configure your authtoken in API Key Management (Menu option 2)"
+            return nil
+          end
         end
       rescue => e
         # Continue retrying
@@ -733,8 +741,20 @@ class TunnelManager
     # Fallback: parse logs
     6.times do
       if File.exist?(log_file)
+        # Check for auth error first
+        if File.read(log_file).include?('dashboard.ngrok.com/get-started/your-authtoken')
+          error "Ngrok authentication required!"
+          warn "Get your authtoken from: https://dashboard.ngrok.com/get-started/your-authtoken"
+          warn "Then configure it in API Key Management (Menu option 2)"
+          return nil
+        end
+        
         url = `grep -o "https://[^ ]*ngrok[^ ]*" #{log_file} 2>/dev/null | head -1`.strip
-        return url unless url.empty?
+        
+        # Make sure it's not the dashboard URL
+        if !url.empty? && !url.include?('dashboard.ngrok.com')
+          return url
+        end
       end
       sleep 1
     end
@@ -967,7 +987,7 @@ class APIKeyManager
       return
     end
     
-    ask "Enter Ngrok authtoken (from https://dashboard.ngrok.com): "
+    ask "Enter Ngrok authtoken (from https://dashboard.ngrok.com/get-started/your-authtoken): "
     token = gets.chomp.strip
     
     if token.empty?
@@ -1198,7 +1218,7 @@ class CLI
 
   def display_results(urls)
     puts ""
-    UI.header(" 🌍 PUBLIC URLS READY")
+    UI.header(" 🌍 PUBLIC URLS READY ")
     
     active_tunnels = urls.select { |_, url| url }
     
@@ -1291,7 +1311,7 @@ class CLI
     puts "  6. Share the public URLs with others!"
     
     puts "\n#{BCYAN}API KEY CONFIGURATION:#{RESET}"
-    puts "  • Ngrok: Get authtoken from https://dashboard.ngrok.com"
+    puts "  • Ngrok: Get authtoken from https://dashboard.ngrok.com/get-started/your-authtoken"
     puts "  • Loclx: Get access token from https://localxpose.io/dashboard"
     puts "  #{DIM}Benefits: Remove rate limits, persistent URLs, priority support#{RESET}"
     
