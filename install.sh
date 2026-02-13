@@ -229,7 +229,7 @@ LOC_URL=""
 
 case "$ARCH" in
     aarch64|armv8*)
-        LOC_URL="https://loclx-client.s3.amazonaws.com//loclx-linux-arm64.zip"
+        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm64.zip"
         ;;
     armv7l|armv6l)
         LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm.zip"
