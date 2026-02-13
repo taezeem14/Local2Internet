@@ -331,17 +331,19 @@ class ModernUI
     puts "\n"
   end
   
-  def progress_bar(current, total, label = "Progress")
-    percentage = (current.to_f / total * 100).round
-    filled = (40 * current / total).round
-    empty = 40 - filled
-    
-    bar_filled = @theme.gradient_text("█" * filled, @theme.current_theme[:success])
-    bar_empty = "#{DIM}░" * empty
-    
-    print "\r#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}: [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{percentage}%", @theme.current_theme[:success]))}"
-    puts if current >= total
-  end
+def progress_bar(current, total, label = "Progress")
+  return if total.to_i <= 0
+
+  percentage = (current.to_f / total * 100).round
+  filled = (40 * current / total.to_f).round
+  empty = 40 - filled
+
+  bar_filled = @theme.gradient_text("█" * filled, @theme.current_theme[:success])
+  bar_empty = "#{DIM}░" * empty
+
+  print "\r#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}: [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{percentage}%", @theme.current_theme[:success]))}"
+  puts if current >= total
+end
   
   def spinner(message, &block)
     frames = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']
@@ -412,17 +414,19 @@ class ModernUI
     puts "#{@theme.gradient_text("└#{col_widths.map { |w| border * w }.join('┴')}┘", @theme.current_theme[:primary])}\n"
   end
   
-  def gauge(label, value, max_value, unit = "")
-    percentage = (value.to_f / max_value * 100).round
-    filled = (30 * value / max_value).round
-    empty = 30 - filled
-    
-    bar_filled = @theme.gradient_text("▰" * filled, @theme.current_theme[:success])
-    bar_empty = "#{DIM}▱" * empty
-    
-    puts "#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}"
-    puts "  [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{value}#{unit} / #{max_value}#{unit}", @theme.current_theme[:success]))} #{DIM}(#{percentage}%)#{RESET}"
-  end
+def gauge(label, value, max_value, unit = "")
+  return if max_value.to_i <= 0
+
+  percentage = (value.to_f / max_value * 100).round
+  filled = (30 * value / max_value.to_f).round
+  empty = 30 - filled
+
+  bar_filled = @theme.gradient_text("▰" * filled, @theme.current_theme[:success])
+  bar_empty = "#{DIM}▱" * empty
+
+  puts "#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}"
+  puts "  [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{value}#{unit} / #{max_value}#{unit}", @theme.current_theme[:success]))} #{DIM}(#{percentage}%)#{RESET}"
+end
   
   def badge(text, type = :default)
     colors = {
