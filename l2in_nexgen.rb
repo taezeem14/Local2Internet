@@ -666,8 +666,8 @@ def self.download_loclx
   exec_silent("chmod +x #{TOOLS[:loclx]}")
 
   File.exist?(TOOLS[:loclx])
+  end
 end
-
 
 # ------------------ TUNNEL MANAGER ------------------
 
@@ -1590,3 +1590,4 @@ rescue StandardError => e
   ProcessManager.cleanup
   exit 1
 end
+  end
