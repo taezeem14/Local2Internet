@@ -684,7 +684,16 @@ class TunnelManager
     end
 
     cmd = "#{TOOLS[:ngrok]} http --log=stdout --log-level=info #{@port}"
-    cmd = "cd #{BIN_DIR} && termux-chroot #{cmd}" if termux? && proot_available?
+    
+    # Termux: Use proot if available, otherwise try directly
+    if termux?
+      if proot_available?
+        cmd = "cd #{BIN_DIR} && termux-chroot #{cmd}"
+        info "Using termux-chroot for Ngrok"
+      else
+        warn "Running Ngrok without proot (may fail)"
+      end
+    end
 
     pid = spawn("#{cmd} > #{log_file} 2>&1")
     ProcessManager.register(:ngrok, pid)
@@ -746,12 +755,19 @@ class TunnelManager
           return url
         end
         
-        # If we still can't find it, log a sample for debugging
-        if url.empty? && log_content.length > 100
-          info "Ngrok log sample: #{log_content[0..200]}"
+        # Termux-specific debugging
+        if termux? && url.empty? && log_content.length > 100
+          warn "Ngrok may not be compatible with Termux on this device"
+          info "Log snippet: #{log_content[0..150].gsub(/\n/, ' ')}"
         end
       end
       sleep 1
+    end
+    
+    # Final Termux-specific message
+    if termux?
+      error "Ngrok failed to start in Termux"
+      info "This is common on Android. Cloudflare tunnel may work better."
     end
 
     nil
@@ -1470,11 +1486,22 @@ def run_server(config, stats)
   server_mode = cli.select_server
   port = cli.get_port
   
-  # Termux reminder
+  # Termux reminder with better guidance
   if termux?
     warn "Termux detected!"
     info "For best results, enable mobile hotspot or connect to WiFi"
     info "Tunnel initialization may take 30-60 seconds"
+    
+    unless proot_available?
+      warn "Proot not detected - tunnels may not work properly"
+      info "Install with: pkg install proot"
+      ask "Continue anyway? (Y/n): "
+      choice = gets.chomp.strip.downcase
+      return if choice == 'n'
+    else
+      info "Proot detected - using termux-chroot for compatibility"
+    end
+    
     sleep 3
   end
   
