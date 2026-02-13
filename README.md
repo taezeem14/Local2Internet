@@ -175,7 +175,7 @@
 
 ```bash
 # One-line installer
-curl -sL https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install_nexgen.sh | bash
+curl -sL https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install.sh | bash
 
 # Or manual install
 git clone https://github.com/Taezeem14/Local2Internet.git
@@ -188,7 +188,7 @@ chmod +x l2in_nexgen.rb
 
 ```powershell
 # One-line installer (PowerShell 7+)
-iwr -useb https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install_nexgen.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install.ps1 | iex
 
 # Or manual install
 git clone https://github.com/Taezeem14/Local2Internet.git
@@ -537,23 +537,6 @@ ngrok_token: "abc123"
 
 ---
 
-## 📚 Documentation
-
-### 📖 Full Guides
-- [Installation Guide](docs/installation.md)
-- [Configuration Reference](docs/configuration.md)
-- [Plugin Development](docs/plugins.md)
-- [Theme Customization](docs/themes.md)
-- [API Reference](docs/api.md)
-- [Troubleshooting](docs/troubleshooting.md)
-
-### 🎓 Video Tutorials
-- [Getting Started (5 min)](https://youtube.com/watch?v=example)
-- [Theme Customization (8 min)](https://youtube.com/watch?v=example)
-- [Plugin Development (15 min)](https://youtube.com/watch?v=example)
-
----
-
 ## 🤝 Contributing
 
 We welcome contributions! Here's how:
@@ -589,11 +572,6 @@ We welcome contributions! Here's how:
 - 🎨 **Design Agencies**: Client previews
 - 🏫 **Education**: Teaching web development
 - 💼 **Enterprise**: Internal tool sharing
-
-### Community Projects
-- [l2in-vscode](https://github.com/example/l2in-vscode) - VS Code extension
-- [l2in-raycast](https://github.com/example/l2in-raycast) - Raycast extension
-- [l2in-alfred](https://github.com/example/l2in-alfred) - Alfred workflow
 
 ---
 
@@ -689,8 +667,6 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 
 ---
 
-[![Twitter](https://img.shields.io/badge/Twitter-@l2internet-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/l2internet)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/l2internet)
 [![Telegram](https://img.shields.io/badge/Telegram-@Taezeem__14-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/Taezeem_14)
 
 </div>
