@@ -228,11 +228,22 @@ ARCH=$(uname -m)
 LOC_URL=""
 
 case "$ARCH" in
-    x86_64) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-amd64.zip" ;;
-    i386|i686) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-386.zip" ;;
-    armv7l|armv6l) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm.zip" ;;
-    aarch64|arm64) LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm64.zip" ;;
-    *) warn "Unsupported architecture for Loclx: $ARCH, skipping Loclx install"; LOC_URL="" ;;
+    aarch64) 
+        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm64.zip"
+        ;;
+    armv7l|armv6l) 
+        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm.zip"
+        ;;
+    x86_64) 
+        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-amd64.zip"
+        ;;
+    i386|i686) 
+        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-386.zip"
+        ;;
+    *)
+        warn "Unsupported architecture for Loclx: $ARCH, skipping Loclx install"
+        LOC_URL=""
+        ;;
 esac
 
 if [ -n "$LOC_URL" ]; then
