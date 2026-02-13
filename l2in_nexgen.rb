@@ -162,7 +162,7 @@ end
 
 # ------------------ UTILITIES ------------------
 
-def success(msg, icon = "✓")
+def success(msg, icon = "✓ ")
   puts "#{BGREEN}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
@@ -170,15 +170,15 @@ def info(msg, icon = "ℹ")
   puts "#{BCYAN}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
-def warn(msg, icon = "⚠")
+def warn(msg, icon = "⚠ ")
   puts "#{BYELLOW}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
-def error(msg, icon = "✗")
+def error(msg, icon = "✗ ")
   puts "#{BRED}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
-def ask(msg, icon = "❯")
+def ask(msg, icon = "❯ ")
   print "#{BYELLOW}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
