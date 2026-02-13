@@ -263,7 +263,6 @@ if [ -n "$LOC_URL" ]; then
     LOCLX_BIN=$(find "$LOC_DIR" -type f -name "loclx" | head -n 1)
 
     if [ -n "$LOCLX_BIN" ]; then
-        mv "$LOCLX_BIN" "$LOC_DIR/loclx"
         chmod +x "$LOC_DIR/loclx"
         success "Loclx installed at $LOC_DIR/loclx"
     else
