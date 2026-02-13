@@ -1527,7 +1527,7 @@ end
 begin
   setup_signal_handlers
   ProcessManager.cleanup
-  ensure_dirs
+  ensure_dirs()
   
   # Initialize managers
   config = ConfigManager.new
