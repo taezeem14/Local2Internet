@@ -649,28 +649,25 @@ class ToolDownloader
     true
   end
 
-  def self.download_loclx
-    # Determine correct architecture-specific binary
-    url = case arch
-    when /arm(?!64)/ then "npm install -g loclx"
-    when /aarch64|arm64/ then "npm install -g loclx"
-    when /x86_64/ then "npm install -g loclx"
-    else "npm install -g loclx"
-    end
-    
-    tmp = "#{BASE_DIR}/loclx.tmp"
+def self.download_loclx
+  info "Installing Loclx via npm..."
 
-    return false unless exec_silent("wget -q #{url} -O #{tmp}")
-    return false unless exec_silent("tar -xzf #{tmp} -C #{BIN_DIR}")
-    
-    # The extracted binary might be named 'loclx' already
-    exec_silent("mv #{BIN_DIR}/loclx #{TOOLS[:loclx]} 2>/dev/null")
-    exec_silent("chmod +x #{TOOLS[:loclx]}")
-    
-    File.delete(tmp) rescue nil
-    File.exist?(TOOLS[:loclx])
+  unless command_exists?("npm")
+    warn "npm not found. Cannot install loclx."
+    return false
   end
+
+  return false unless exec_silent("npm install -g loclx")
+
+  loclx_path = `command -v loclx`.strip
+  return false if loclx_path.empty?
+
+  FileUtils.cp(loclx_path, TOOLS[:loclx])
+  exec_silent("chmod +x #{TOOLS[:loclx]}")
+
+  File.exist?(TOOLS[:loclx])
 end
+
 
 # ------------------ TUNNEL MANAGER ------------------
 
@@ -749,7 +746,7 @@ class TunnelManager
           return nil
         end
         
-        url = `grep -o "https://[a-zA-Z0-9.-]*\.ngrok[^ ]*" #{log_file} 2>/dev/null | head -1`.strip
+        url = `grep -o "https://[a-zA-Z0-9.-]*ngrok[^ ]*" #{log_file} 2>/dev/null | head -1`.strip
         
         # Make sure it's not the dashboard URL
         if !url.empty? && !url.include?('dashboard.ngrok.com')
@@ -829,7 +826,7 @@ class TunnelManager
       warn "Cloudflared binary not found"
     end
 
-    if File.exist?(TOOLS[:loclx])
+    if File.exist?(TOOLS[:loclx]) || command_exists?("loclx")
       results[:loclx] = start_loclx
     else
       warn "Loclx binary not found"
