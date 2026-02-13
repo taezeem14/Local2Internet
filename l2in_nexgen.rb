@@ -1590,4 +1590,3 @@ rescue StandardError => e
   ProcessManager.cleanup
   exit 1
 end
-  end
