@@ -436,7 +436,7 @@ We welcome contributions! Here's how to help:
 ### Submitting Pull Requests
 ```bash
 # 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/Local2Internet.git
+git clone https://github.com/taezeem14/Local2Internet.git
 
 # 2. Create feature branch
 git checkout -b feature/amazing-feature
