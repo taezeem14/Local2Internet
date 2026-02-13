@@ -30,6 +30,7 @@ HOME = ENV["HOME"]
 BASE_DIR = "#{HOME}/.local2internet"
 LOG_DIR  = "#{BASE_DIR}/logs"
 BIN_DIR  = "#{BASE_DIR}/bin"
+TOOLS_DIR = "#{BASE_DIR}/tools"  # Add this for Loclx
 STATS_DIR = "#{BASE_DIR}/stats"
 CONFIG_FILE = "#{BASE_DIR}/config.yml"
 SESSION_FILE = "#{BASE_DIR}/session.json"
@@ -37,7 +38,7 @@ SESSION_FILE = "#{BASE_DIR}/session.json"
 TOOLS = {
   ngrok: "#{BIN_DIR}/ngrok",
   cloudflared: "#{BIN_DIR}/cloudflared",
-  loclx: "#{BIN_DIR}/loclx"
+  loclx: "#{BASE_DIR}/tools/loclx"  # Installer puts it in tools/ not bin/
 }
 
 DEPENDENCIES = %w[python3 php wget unzip curl]
@@ -206,7 +207,7 @@ def command_exists?(cmd)
 end
 
 def ensure_dirs
-  [BASE_DIR, LOG_DIR, BIN_DIR, STATS_DIR].each do |d|
+  [BASE_DIR, LOG_DIR, BIN_DIR, TOOLS_DIR, STATS_DIR].each do |d|
     begin
       FileUtils.mkdir_p(d)
     rescue => e
@@ -719,8 +720,10 @@ class TunnelManager
     # Fallback: parse logs
     8.times do  # Increased retries
       if File.exist?(log_file)
+        log_content = File.read(log_file)
+        
         # Check for auth error first
-        if File.read(log_file).include?('dashboard.ngrok.com/get-started/your-authtoken')
+        if log_content.include?('dashboard.ngrok.com/get-started/your-authtoken')
           error "Ngrok authentication required!"
           warn "Get your authtoken from: https://dashboard.ngrok.com/get-started/your-authtoken"
           warn "Then configure it in API Key Management (Menu option 2)"
@@ -732,12 +735,20 @@ class TunnelManager
         
         # Fallback to old pattern but exclude known bad URLs
         if url.empty?
-          url = `grep -o "https://[a-zA-Z0-9.-]*ngrok[^ ]*" #{log_file} 2>/dev/null | grep -v "dashboard.ngrok.com" | grep -v "ngrok.com/download" | head -1`.strip
+          url = `grep -o "https://[a-zA-Z0-9.-]*ngrok[^ ]*" #{log_file} 2>/dev/null | grep -v "dashboard.ngrok.com" | grep -v "ngrok.com/download" | grep -v "ngrok.com/docs" | head -1`.strip
         end
         
+        # Clean up any trailing punctuation (commas, periods, etc)
+        url = url.gsub(/[,\.;]+$/, '') if url
+        
         # Return if we found a valid tunnel URL
-        if !url.empty? && !url.include?('dashboard.ngrok.com') && !url.include?('ngrok.com/download')
+        if !url.empty? && !url.include?('dashboard.ngrok.com') && !url.include?('ngrok.com/download') && !url.include?('ngrok.com/docs')
           return url
+        end
+        
+        # If we still can't find it, log a sample for debugging
+        if url.empty? && log_content.length > 100
+          info "Ngrok log sample: #{log_content[0..200]}"
         end
       end
       sleep 1
