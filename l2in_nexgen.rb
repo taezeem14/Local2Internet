@@ -652,10 +652,10 @@ class ToolDownloader
   def self.download_loclx
     # Determine correct architecture-specific binary
     url = case arch
-    when /arm(?!64)/ then "https://loclx.io/release/latest/loclx_linux_arm.tar.gz"
-    when /aarch64|arm64/ then "https://loclx.io/release/latest/loclx_linux_arm64.tar.gz"
-    when /x86_64/ then "https://loclx.io/release/latest/loclx_linux_amd64.tar.gz"
-    else "https://loclx.io/release/latest/loclx_linux_386.tar.gz"
+    when /arm(?!64)/ then "npm install -g loclx"
+    when /aarch64|arm64/ then "npm install -g loclx"
+    when /x86_64/ then "npm install -g loclx"
+    else "npm install -g loclx"
     end
     
     tmp = "#{BASE_DIR}/loclx.tmp"
