@@ -229,16 +229,16 @@ LOC_URL=""
 
 case "$ARCH" in
     aarch64|armv8*)
-        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm64.zip"
+        LOC_URL="https://loclx-client.s3.amazonaws.com//loclx-linux-arm64.zip"
         ;;
     armv7l|armv6l)
-        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm.zip"
+        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm.zip"
         ;;
     x86_64)
-        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-amd64.zip"
+        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-amd64.zip"
         ;;
     i386|i686)
-        LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-386.zip"
+        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-386.zip"
         ;;
     *)
         warn "Unsupported architecture: $ARCH"
