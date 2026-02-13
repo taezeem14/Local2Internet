@@ -219,19 +219,20 @@ class ThemeEngine
   end
   
   def gradient_text(text, colors)
-    return text if colors.length < 2
-    
-    chars = text.chars
-    gradient = []
-    
-    chars.each_with_index do |char, i|
-      ratio = i.to_f / (chars.length - 1)
-      color_index = (ratio * (colors.length - 1)).floor
-      gradient << "#{colors[color_index]}#{char}"
-    end
-    
-    gradient.join + RESET
+  return text if colors.length < 2
+  return "#{colors.first}#{text}#{RESET}" if text.length <= 1
+
+  chars = text.chars
+  gradient = []
+
+  chars.each_with_index do |char, i|
+    ratio = i.to_f / (chars.length - 1)
+    color_index = (ratio * (colors.length - 1)).floor
+    gradient << "#{colors[color_index]}#{char}"
   end
+
+  gradient.join + RESET
+end
   
   def apply_glow(text)
     return text unless @current_theme[:glow]
