@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 # ==========================================================
-# Local2Internet v5.0 ULTIMATE - Next Generation Edition
+# Local2Internet v6.0 ULTIMATE - Next Generation Edition
 # FIXED: Graceful tunnel failure handling for Termux
 #
 # Description:
