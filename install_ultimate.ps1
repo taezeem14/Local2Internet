@@ -1,5 +1,5 @@
 # =========================================
-# Local2Internet v4.1 - Advanced Auto Installer
+# Local2Internet v5 - Advanced Auto Installer
 # Platform: Windows PowerShell
 # Author: Muhammad Taezeem Tariq Matta
 # =========================================
@@ -31,7 +31,7 @@ $($C.Red)
 ▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀
 $($C.Yellow)▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░
 $($C.Green)▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-$($C.Blue)                                      [Auto Installer v4.1 Advanced]
+$($C.Blue)                                      [Auto Installer v5 Advanced]
 $($C.Reset)
 "@
 
@@ -218,8 +218,8 @@ if (Test-Path $installDir) {
             Write-Info "To run Local2Internet:"
             Write-Host "  $($C.Yellow)cd $installDir$($C.Reset)"
             
-            if (Test-Path "$installDir\l2in_advanced.ps1") {
-                Write-Host "  $($C.Yellow).\l2in_advanced.ps1$($C.Reset)"
+            if (Test-Path "$installDir\l2in_ultimate.ps1") {
+                Write-Host "  $($C.Yellow).\l2in_ultimate.ps1$($C.Reset)"
             } else {
                 Write-Host "  $($C.Yellow).\l2in.ps1$($C.Reset)"
             }
@@ -263,15 +263,15 @@ if ($createShortcut -ne 'n' -and $createShortcut -ne 'N') {
         $Shortcut.TargetPath = "powershell.exe"
         
         # Use advanced version if available
-        if (Test-Path "$installDir\l2in_advanced.ps1") {
-            $Shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$installDir\l2in_advanced.ps1`""
+        if (Test-Path "$installDir\l2in_ultimate.ps1") {
+            $Shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$installDir\l2in_ultimate.ps1`""
         } else {
             $Shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$installDir\l2in.ps1`""
         }
         
         $Shortcut.WorkingDirectory = $installDir
         $Shortcut.IconLocation = "powershell.exe,0"
-        $Shortcut.Description = "Local2Internet v4.1 Advanced - Expose localhost to internet"
+        $Shortcut.Description = "Local2Internet v5 Advanced - Expose localhost to internet"
         $Shortcut.Save()
         
         Write-Success "Desktop shortcut created!"
@@ -307,11 +307,11 @@ Write-Host "$($C.Green)║     INSTALLATION SUCCESSFUL! 🎉        ║$($C.Rese
 Write-Host "$($C.Green)╚════════════════════════════════════════╝$($C.Reset)"
 Write-Host ""
 
-Write-Success "Local2Internet v4.1 Advanced installed successfully!"
+Write-Success "Local2Internet v5 Advanced installed successfully!"
 Write-Host ""
 Write-Info "Installation location: $($C.Yellow)$installDir$($C.Reset)"
 Write-Host ""
-Write-Info "New features in v4.1:"
+Write-Info "New features in v5:"
 Write-Host "  $($C.Cyan)• API Key Support (Ngrok & Loclx)$($C.Reset)"
 Write-Host "  $($C.Cyan)• Enhanced Error Handling$($C.Reset)"
 Write-Host "  $($C.Cyan)• Auto Port Detection$($C.Reset)"
@@ -321,8 +321,8 @@ Write-Host ""
 Write-Info "To start using Local2Internet:"
 Write-Host "  $($C.Yellow)cd $installDir$($C.Reset)"
 
-if (Test-Path "$installDir\l2in_advanced.ps1") {
-    Write-Host "  $($C.Yellow).\l2in_advanced.ps1$($C.Reset)"
+if (Test-Path "$installDir\l2in_ultimate.ps1") {
+    Write-Host "  $($C.Yellow).\l2in_ultimate.ps1$($C.Reset)"
 } else {
     Write-Host "  $($C.Yellow).\l2in.ps1$($C.Reset)"
 }
@@ -342,8 +342,8 @@ if ($runNow -ne 'n' -and $runNow -ne 'N') {
     Start-Sleep -Seconds 1
     Set-Location $installDir
     
-    if (Test-Path ".\l2in_advanced.ps1") {
-        & ".\l2in_advanced.ps1"
+    if (Test-Path ".\l2in_ultimate.ps1") {
+        & ".\l2in_ultimate.ps1"
     } else {
         & ".\l2in.ps1"
     }
