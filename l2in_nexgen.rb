@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # ==========================================================
 # Local2Internet v5.0 ULTIMATE - Next Generation Edition
-# NGROK AUTH FIX - Proper token authentication
+# FIXED: Graceful tunnel failure handling for Termux
 #
 # Description:
 #   Professional-grade localhost exposure tool with advanced
@@ -10,6 +10,7 @@
 # Original Author  : KasRoudra
 # Enhanced By      : Muhammad Taezeem Tariq Matta (Bro)
 # Ultimate Edition : Claude AI (2026)
+# Fixed By         : Claude AI (February 2026)
 # Repository       : github.com/Taezeem14/Local2Internet
 # License          : MIT
 # ==========================================================
@@ -42,7 +43,7 @@ TOOLS = {
 DEPENDENCIES = %w[python3 php wget unzip curl]
 DEFAULT_PORT = 8888
 VERSION = "6.0"
-EDITION = "ULTIMATE"
+EDITION = "ULTIMATE-FIXED"
 
 # ------------------ ENHANCED COLORS & UI ------------------
 
@@ -603,7 +604,6 @@ class ToolDownloader
       case tool
       when :ngrok then download_ngrok
       when :cloudflared then download_cloudflared
-      when :loclx then download_loclx
       end
       
       sleep 0.5
@@ -648,25 +648,6 @@ class ToolDownloader
     exec_silent("chmod +x #{TOOLS[:cloudflared]}")
     true
   end
-
-def self.download_loclx
-  info "Installing Loclx via npm..."
-
-  unless command_exists?("npm")
-    warn "npm not found. Cannot install loclx."
-    return false
-  end
-
-  return false unless exec_silent("npm install -g loclx")
-
-  loclx_path = `command -v loclx`.strip
-  return false if loclx_path.empty?
-
-  FileUtils.cp(loclx_path, TOOLS[:loclx])
-  exec_silent("chmod +x #{TOOLS[:loclx]}")
-
-  File.exist?(TOOLS[:loclx])
-  end
 end
 
 # ------------------ TUNNEL MANAGER ------------------
@@ -707,10 +688,10 @@ class TunnelManager
     pid = spawn("#{cmd} > #{log_file} 2>&1")
     ProcessManager.register(:ngrok, pid)
     
-    sleep(termux? ? 8 : 5)
+    sleep(termux? ? 10 : 5)  # Increased wait time for Termux
 
     # Try API first (best method)
-    12.times do
+    15.times do  # Increased retries
       begin
         uri = URI.parse("http://127.0.0.1:4040/api/tunnels")
         response = Net::HTTP.get(uri)
@@ -736,7 +717,7 @@ class TunnelManager
     end
 
     # Fallback: parse logs
-    6.times do
+    8.times do  # Increased retries
       if File.exist?(log_file)
         # Check for auth error first
         if File.read(log_file).include?('dashboard.ngrok.com/get-started/your-authtoken')
@@ -770,9 +751,9 @@ class TunnelManager
     pid = spawn("#{cmd} > #{log_file} 2>&1")
     ProcessManager.register(:cloudflared, pid)
     
-    sleep(termux? ? 12 : 7)
+    sleep(termux? ? 15 : 7)  # Increased wait time for Termux
 
-    20.times do
+    25.times do  # Increased retries
       if File.exist?(log_file)
         url = `grep -o "https://[^ ]*trycloudflare.com" #{log_file} 2>/dev/null | head -1`.strip
         return url unless url.empty?
@@ -796,9 +777,9 @@ class TunnelManager
     pid = spawn("#{cmd} > #{log_file} 2>&1")
     ProcessManager.register(:loclx, pid)
     
-    sleep(termux? ? 10 : 6)
+    sleep(termux? ? 12 : 6)  # Increased wait time for Termux
 
-    20.times do
+    25.times do  # Increased retries
       if File.exist?(log_file)
         url = `grep -o "https://[a-zA-Z0-9.-]*\.loclx.io" #{log_file} 2>/dev/null | head -1`.strip
         return url unless url.empty?
@@ -810,7 +791,7 @@ class TunnelManager
   end
 
   def start_all
-    warn "Initializing all tunnels..." if termux?
+    warn "Initializing all tunnels (this may take a while)..." if termux?
     
     results = {}
     
@@ -1213,32 +1194,38 @@ class CLI
     port_num
   end
 
-  def display_results(urls)
+  def display_results(urls, port)
     puts ""
-    UI.header(" 🌍 PUBLIC URLS READY ")
+    UI.header(" 🌍 SERVER STATUS ")
     
     active_tunnels = urls.select { |_, url| url }
     
+    # Always show local server info first
+    success "Local server running at http://127.0.0.1:#{port}"
+    
     if active_tunnels.empty?
-      error "All tunnels failed to start!"
+      puts ""
+      warn "All public tunnels failed to start"
       
       UI.box([
-        "Troubleshooting:",
-        "• Check your internet connection",
-        "• Verify firewall settings",
-        "• Configure API keys (Menu option 2)",
-        "• Check logs in: #{LOG_DIR}",
+        "Local server is running successfully!",
+        "You can access it on your local network.",
         "",
-        "Server is still accessible locally"
+        "To enable public access:",
+        "• Configure API keys (Menu option 2)",
+        "• Check your internet connection",
+        "• Review firewall settings",
+        "• Check logs in: #{LOG_DIR}"
       ], BYELLOW)
       
-      return false
+      return :local_only  # Return symbol indicating local-only mode
     end
     
-    # Display as table
+    # Display tunnel results as table
+    puts "\n#{BGREEN}Public Tunnels:#{RESET}"
     rows = urls.map do |service, url|
       status = url ? "#{BGREEN}Active#{RESET}" : "#{BRED}Failed#{RESET}"
-      [service.to_s.capitalize, url || "N/A", status]
+      [service.to_s.capitalize, url || "Failed to start", status]
     end
     
     UI.table(["Service", "Public URL", "Status"], rows)
@@ -1256,7 +1243,7 @@ class CLI
       puts "\n#{BCYAN}Quick copy:#{RESET} #{url}"
     end
     
-    true
+    :public_tunnels  # Return symbol indicating public tunnels active
   end
 
   def show_about
@@ -1270,6 +1257,7 @@ class CLI
       "Author       : KasRoudra",
       "Enhanced By  : Muhammad Taezeem Tariq Matta",
       "Ultimate By  : Claude AI (2026)",
+      "Fixed By     : Claude AI (February 2026)",
       "Github       : github.com/Taezeem14/Local2Internet",
       "License      : MIT Open Source"
     ], BPURPLE)
@@ -1277,6 +1265,7 @@ class CLI
     puts "\n#{BCYAN}✨ Features:#{RESET}"
     features = [
       "Triple Tunneling (Ngrok, Cloudflare, Loclx)",
+      "Graceful tunnel failure handling",
       "API Key Support & Management",
       "Auto-Recovery & Health Monitoring",
       "Real-Time Statistics Tracking",
@@ -1305,7 +1294,7 @@ class CLI
     puts "  3. Choose your preferred server protocol"
     puts "  4. Enter a port number (or use default)"
     puts "  5. Wait for tunnels to initialize"
-    puts "  6. Share the public URLs with others!"
+    puts "  6. Server will run even if tunnels fail!"
     
     puts "\n#{BCYAN}API KEY CONFIGURATION:#{RESET}"
     puts "  • Ngrok: Get authtoken from https://dashboard.ngrok.com/get-started/your-authtoken"
@@ -1314,7 +1303,7 @@ class CLI
     
     puts "\n#{BCYAN}TROUBLESHOOTING:#{RESET}"
     puts "  • Port in use: Tool will suggest alternatives automatically"
-    puts "  • Tunnels fail: Check internet, firewall, add API keys"
+    puts "  • Tunnels fail: Server continues locally, configure API keys for public access"
     puts "  • Server fails: Ensure directory has index.html or index.php"
     puts "  • Termux issues: Make sure proot is installed (pkg install proot)"
     
@@ -1327,6 +1316,7 @@ class CLI
     puts "  • Auto-recovery: Tunnels auto-restart on failure"
     puts "  • Health monitoring: Real-time tunnel status checking"
     puts "  • Session persistence: Remembers your preferences"
+    puts "  • Graceful degradation: Server runs even if all tunnels fail"
     
     ask "\n#{DIM}Press ENTER to continue...#{RESET}"
     gets
@@ -1425,9 +1415,11 @@ def run_server(config, stats)
   # Pre-flight checks
   unless NetworkUtils.check_internet
     error "No internet connection detected!"
-    warn "Tunneling requires an active internet connection"
-    ask "\nContinue anyway? (y/N): "
-    return unless gets.chomp.downcase == 'y'
+    warn "Public tunneling requires an active internet connection"
+    warn "Server will run locally only"
+    ask "\nContinue anyway? (Y/n): "
+    choice = gets.chomp.strip.downcase
+    return if choice == 'n'
   end
   
   cli = CLI.new(config)
@@ -1441,7 +1433,8 @@ def run_server(config, stats)
   if termux?
     warn "Termux detected!"
     info "For best results, enable mobile hotspot or connect to WiFi"
-    sleep 2
+    info "Tunnel initialization may take 30-60 seconds"
+    sleep 3
   end
   
   # Start local server
@@ -1452,30 +1445,43 @@ def run_server(config, stats)
   tunnel_manager = TunnelManager.new(port, config)
   urls = tunnel_manager.start_all
   
-  # Display results
-  has_urls = cli.display_results(urls)
+  # Display results - CHANGED: Now returns status symbol instead of boolean
+  status = cli.display_results(urls, port)
   
-  return unless has_urls
+  # CRITICAL FIX: Don't return early - continue regardless of tunnel status
+  # Server is running locally, so we should keep it alive
   
-  # Save session
+  # Save session with appropriate status
   session_data = {
     active: true,
     pid: Process.pid,
     port: port,
     mode: server_mode,
     started_at: Time.now,
-    urls: urls
+    urls: urls,
+    status: status  # :public_tunnels or :local_only
   }
   SessionManager.save_session(session_data)
   
-  # Start monitoring
-  tunnel_manager.start_monitoring
+  # Start monitoring only if we have active tunnels
+  if status == :public_tunnels
+    tunnel_manager.start_monitoring
+    monitoring_enabled = true
+  else
+    monitoring_enabled = false
+    info "Running in local-only mode (no tunnel monitoring)"
+  end
   
   # Keep alive with status updates
   start_time = Time.now
   
   puts "\n#{BCYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{RESET}"
-  puts "#{BGREEN}Server is running with health monitoring enabled#{RESET}"
+  if status == :public_tunnels
+    puts "#{BGREEN}Server is running with public tunnels and health monitoring#{RESET}"
+  else
+    puts "#{BYELLOW}Server is running in local-only mode#{RESET}"
+    puts "#{DIM}Configure API keys (Menu option 2) to enable public access#{RESET}"
+  end
   puts "#{DIM}Press CTRL+C to stop and return to menu#{RESET}"
   puts "#{BCYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{RESET}\n"
   
@@ -1488,12 +1494,16 @@ def run_server(config, stats)
       hours = (uptime / 3600).to_i
       minutes = ((uptime % 3600) / 60).to_i
       
-      print "\r#{DIM}Uptime: #{hours}h #{minutes}m | Monitoring active#{RESET}"
+      if monitoring_enabled
+        print "\r#{DIM}Uptime: #{hours}h #{minutes}m | Monitoring active | Local: http://127.0.0.1:#{port}#{RESET}"
+      else
+        print "\r#{DIM}Uptime: #{hours}h #{minutes}m | Local-only mode | http://127.0.0.1:#{port}#{RESET}"
+      end
     end
   rescue Interrupt
     # Handled by signal trap
   ensure
-    tunnel_manager.stop_monitoring
+    tunnel_manager.stop_monitoring if monitoring_enabled
     
     # Record session statistics
     duration = (Time.now - start_time).to_i
