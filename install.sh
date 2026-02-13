@@ -228,32 +228,57 @@ ARCH=$(uname -m)
 LOC_URL=""
 
 case "$ARCH" in
-    aarch64) 
+    aarch64|armv8*)
         LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm64.zip"
         ;;
-    armv7l|armv6l) 
+    armv7l|armv6l)
         LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-arm.zip"
         ;;
-    x86_64) 
+    x86_64)
         LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-amd64.zip"
         ;;
-    i386|i686) 
+    i386|i686)
         LOC_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-386.zip"
         ;;
     *)
-        warn "Unsupported architecture for Loclx: $ARCH, skipping Loclx install"
+        warn "Unsupported architecture: $ARCH"
         LOC_URL=""
         ;;
 esac
 
 if [ -n "$LOC_URL" ]; then
     info "Downloading Loclx for $ARCH..."
-    wget -q -L -O "$LOC_DIR/loclx.zip" "$LOC_URL" || error "Failed to download Loclx"
+    wget -L -O "$LOC_DIR/loclx.zip" "$LOC_URL" || {
+        error "Download failed"
+        exit 1
+    }
+
+    # Verify it's actually a zip
+    if ! file "$LOC_DIR/loclx.zip" | grep -q "Zip archive"; then
+        error "Downloaded file is not a valid zip"
+        rm -f "$LOC_DIR/loclx.zip"
+        exit 1
+    fi
+
     info "Extracting Loclx..."
-    unzip -o "$LOC_DIR/loclx.zip" -d "$LOC_DIR" || error "Failed to extract Loclx"
-    chmod +x "$LOC_DIR/loclx"
-    rm "$LOC_DIR/loclx.zip"
-    success "Loclx installed at $LOC_DIR/loclx"
+    unzip -o "$LOC_DIR/loclx.zip" -d "$LOC_DIR" >/dev/null 2>&1 || {
+        error "Extraction failed"
+        exit 1
+    }
+
+    # Find the loclx binary even if inside folder
+    LOCLX_BIN=$(find "$LOC_DIR" -type f -name "loclx" | head -n 1)
+
+    if [ -n "$LOCLX_BIN" ]; then
+        mv "$LOCLX_BIN" "$LOC_DIR/loclx"
+        chmod +x "$LOC_DIR/loclx"
+        success "Loclx installed at $LOC_DIR/loclx"
+    else
+        error "Loclx binary not found after extraction"
+        exit 1
+    fi
+
+    rm -f "$LOC_DIR/loclx.zip"
 fi
 # === END LOCLX INSTALL ===
 
