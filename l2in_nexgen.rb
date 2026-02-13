@@ -704,7 +704,7 @@ class TunnelManager
       warn "Ngrok authtoken not configured (may have rate limits)"
     end
 
-    cmd = "#{TOOLS[:ngrok]} http #{@port}"
+    cmd = "#{TOOLS[:ngrok]} http --log=stdout --log-level=info #{@port}"
     cmd = "cd #{BIN_DIR} && termux-chroot #{cmd}" if termux? && proot_available?
 
     pid = spawn("#{cmd} > #{log_file} 2>&1")
@@ -749,7 +749,7 @@ class TunnelManager
           return nil
         end
         
-        url = `grep -o "https://[^ ]*ngrok[^ ]*" #{log_file} 2>/dev/null | head -1`.strip
+        url = `grep -o "https://[a-zA-Z0-9.-]*\.ngrok[^ ]*" #{log_file} 2>/dev/null | head -1`.strip
         
         # Make sure it's not the dashboard URL
         if !url.empty? && !url.include?('dashboard.ngrok.com')
@@ -791,7 +791,7 @@ class TunnelManager
     log_file = "#{LOG_DIR}/loclx.log"
     File.delete(log_file) if File.exist?(log_file)
 
-    cmd = "#{TOOLS[:loclx]} tunnel http --to :#{@port}"
+    cmd = "#{TOOLS[:loclx]} tunnel http --to :#{@port} --region=us"
     cmd += " --token=#{@config.get('loclx_token')}" if @config.has?('loclx_token')
 
     cmd = "cd #{BIN_DIR} && termux-chroot #{cmd}" if termux? && proot_available?
@@ -803,7 +803,7 @@ class TunnelManager
 
     20.times do
       if File.exist?(log_file)
-        url = `grep -o "https://[^ ]*loclx.io" #{log_file} 2>/dev/null | head -1`.strip
+        url = `grep -o "https://[a-zA-Z0-9.-]*\.loclx.io" #{log_file} 2>/dev/null | head -1`.strip
         return url unless url.empty?
       end
       sleep 1
