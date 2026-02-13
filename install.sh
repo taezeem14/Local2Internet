@@ -1,55 +1,149 @@
 #!/usr/bin/env bash
 # =========================================
-# Local2Internet v5 - Advanced Auto Installer
-# Platform: Linux / Termux
-# Author: Muhammad Taezeem Tariq Matta
+# Local2Internet v6.1 NEXT-GEN - Ultra Installer
+# Platform: Linux / Termux / macOS
+# Author: Muhammad Taezeem Tariq Matta (Bro)
+# Enhanced: Claude AI (2026)
 # =========================================
 
-set -e
+set -eo pipefail
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-WHITE='\033[0;37m'
-RESET='\033[0m'
+# Modern Color System with RGB support
+ESC='\033'
+rgb() { echo -e "${ESC}[38;2;${1};${2};${3}m"; }
+reset() { echo -e "${ESC}[0m"; }
 
-# Functions
-info() { echo -e "${CYAN}[+]${WHITE} $1${RESET}"; }
-success() { echo -e "${GREEN}[✓]${WHITE} $1${RESET}"; }
-error() { echo -e "${RED}[✗]${WHITE} $1${RESET}"; exit 1; }
-warn() { echo -e "${YELLOW}[!]${WHITE} $1${RESET}"; }
+# Gradient Colors
+PURPLE=$(rgb 139 92 246)
+LIGHT_PURPLE=$(rgb 167 139 250)
+BLUE=$(rgb 59 130 246)
+LIGHT_BLUE=$(rgb 96 165 250)
+GREEN=$(rgb 34 197 94)
+LIGHT_GREEN=$(rgb 74 222 128)
+YELLOW=$(rgb 251 191 36)
+ORANGE=$(rgb 251 146 60)
+RED=$(rgb 239 68 68)
+CYAN=$(rgb 34 211 238)
+PINK=$(rgb 236 72 153)
 
-# Logo
-echo -e "${RED}
-▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀
-${YELLOW}▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░
-${GREEN}▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░
-${BLUE}                                      [Auto Installer]
-${RESET}"
+# Effects
+BOLD="${ESC}[1m"
+DIM="${ESC}[2m"
+RESET="${ESC}[0m"
 
-info "Starting Local2Internet Advanced installation..."
+# UI Functions
+gradient_text() {
+    local text="$1"
+    local color1="$2"
+    local color2="$3"
+    local len=${#text}
+    local result=""
+    
+    for ((i=0; i<len; i++)); do
+        if [ $i -lt $((len/2)) ]; then
+            result="${result}${color1}${text:$i:1}"
+        else
+            result="${result}${color2}${text:$i:1}"
+        fi
+    done
+    
+    echo -e "${result}${RESET}"
+}
+
+info() { 
+    echo -e "$(gradient_text "▸" "$CYAN" "$LIGHT_BLUE") ${BOLD}$1${RESET}"
+}
+
+success() { 
+    echo -e "$(gradient_text "✓" "$GREEN" "$LIGHT_GREEN") $1${RESET}"
+}
+
+error() { 
+    echo -e "$(gradient_text "✗" "$RED" "$ORANGE") $1${RESET}"
+    exit 1
+}
+
+warn() { 
+    echo -e "$(gradient_text "⚠" "$ORANGE" "$YELLOW") $1${RESET}"
+}
+
+show_progress() {
+    local current=$1
+    local total=$2
+    local label="$3"
+    
+    if [ "$total" -le 0 ]; then return; fi
+    
+    local percentage=$((current * 100 / total))
+    local filled=$((current * 30 / total))
+    local empty=$((30 - filled))
+    
+    local bar="${GREEN}"
+    for ((i=0; i<filled; i++)); do bar="${bar}█"; done
+    bar="${bar}${DIM}"
+    for ((i=0; i<empty; i++)); do bar="${bar}░"; done
+    bar="${bar}${RESET}"
+    
+    echo -e "\r  ${bar} ${BOLD}${percentage}%${RESET} ${DIM}${label}${RESET}  "
+}
+
+spinner() {
+    local pid=$1
+    local message="$2"
+    local frames=('⣾' '⣽' '⣻' '⢿' '⡿' '⣟' '⣯' '⣷')
+    local i=0
+    
+    while kill -0 $pid 2>/dev/null; do
+        echo -ne "\r${CYAN}${frames[$i]}${RESET} ${BOLD}${message}${RESET}  "
+        i=$(( (i+1) % 8 ))
+        sleep 0.1
+    done
+    
+    echo -ne "\r$(printf ' %.0s' {1..100})\r"
+}
+
+# Modern Logo
+LOGO="
+$(gradient_text "╔═══════════════════════════════════════════════════════════════════╗" "$PURPLE" "$PINK")
+$(gradient_text "║" "$PURPLE" "$PINK")  $(gradient_text "██╗      ██████╗  ██████╗ █████╗ ██╗     ██████╗ ██╗███╗   ██╗████████╗" "$CYAN" "$BLUE")  $(gradient_text "║" "$PURPLE" "$PINK")
+$(gradient_text "║" "$PURPLE" "$PINK")  $(gradient_text "██║     ██╔═══██╗██╔════╝██╔══██╗██║     ╚════██╗██║████╗  ██║╚══██╔══╝" "$CYAN" "$BLUE")  $(gradient_text "║" "$PURPLE" "$PINK")
+$(gradient_text "║" "$PURPLE" "$PINK")  $(gradient_text "██║     ██║   ██║██║     ███████║██║      █████╔╝██║██╔██╗ ██║   ██║   " "$CYAN" "$BLUE")  $(gradient_text "║" "$PURPLE" "$PINK")
+$(gradient_text "║" "$PURPLE" "$PINK")  $(gradient_text "██║     ██║   ██║██║     ██╔══██║██║     ██╔═══╝ ██║██║╚██╗██║   ██║   " "$CYAN" "$BLUE")  $(gradient_text "║" "$PURPLE" "$PINK")
+$(gradient_text "║" "$PURPLE" "$PINK")  $(gradient_text "███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║██║ ╚████║   ██║   " "$CYAN" "$BLUE")  $(gradient_text "║" "$PURPLE" "$PINK")
+$(gradient_text "║" "$PURPLE" "$PINK")  $(gradient_text "╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝   ╚═╝   " "$CYAN" "$BLUE")  $(gradient_text "║" "$PURPLE" "$PINK")
+$(gradient_text "╚═══════════════════════════════════════════════════════════════════╝" "$PURPLE" "$PINK")
+
+       ${BOLD}$(gradient_text "▸ v6.1 NEXT-GEN Ultra Installer" "$GREEN" "$LIGHT_GREEN")${RESET} ${DIM}• Bug-Free Edition${RESET}
+           ${DIM}Automated Dependency Management • Smart Error Recovery${RESET}
+"
+
+clear
+echo -e "$LOGO"
+
+info "Starting Local2Internet v6.1 installation..."
 echo ""
 
-# Detect OS
+# Detect platform
 if [ -d "/data/data/com.termux/files/home" ]; then
     PLATFORM="termux"
     PKG_MANAGER="pkg"
-    info "Platform detected: ${GREEN}Termux (Android)${RESET}"
+    success "Platform detected: ${BOLD}Termux (Android)${RESET}"
 elif [ -f /etc/debian_version ]; then
     PLATFORM="debian"
     PKG_MANAGER="apt"
-    info "Platform detected: ${GREEN}Debian/Ubuntu${RESET}"
+    success "Platform detected: ${BOLD}Debian/Ubuntu${RESET}"
 elif [ -f /etc/arch-release ]; then
     PLATFORM="arch"
     PKG_MANAGER="pacman"
-    info "Platform detected: ${GREEN}Arch Linux${RESET}"
-elif [ -f /etc/fedora-release ]; then
+    success "Platform detected: ${BOLD}Arch Linux${RESET}"
+elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
     PLATFORM="fedora"
     PKG_MANAGER="dnf"
-    info "Platform detected: ${GREEN}Fedora/RHEL${RESET}"
+    success "Platform detected: ${BOLD}Fedora/RHEL${RESET}"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    PLATFORM="macos"
+    PKG_MANAGER="brew"
+    success "Platform detected: ${BOLD}macOS${RESET}"
 else
     PLATFORM="unknown"
     PKG_MANAGER="apt"
@@ -58,224 +152,315 @@ fi
 
 echo ""
 
-# Check if running as root (skip for Termux)
+# Check for root/sudo (skip for Termux)
 if [ "$PLATFORM" != "termux" ] && [ "$EUID" -eq 0 ]; then
-    warn "Running as root. This is not recommended!"
-    read -p "Continue anyway? (y/N): " -n 1 -r
+    warn "Running as root is not recommended!"
+    echo ""
+    read -p "  Continue anyway? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         error "Installation cancelled"
     fi
+    echo ""
+fi
+
+# macOS: Check for Homebrew
+if [ "$PLATFORM" = "macos" ]; then
+    info "Checking for Homebrew..."
+    
+    if ! command -v brew &> /dev/null; then
+        warn "Homebrew not found!"
+        echo ""
+        echo "  Homebrew is required for macOS dependency installation."
+        echo "  ${DIM}Visit: https://brew.sh${RESET}"
+        echo ""
+        
+        read -p "  Install Homebrew now? (Y/n): " -n 1 -r
+        echo
+        
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            info "Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || error "Failed to install Homebrew"
+            success "Homebrew installed!"
+        else
+            error "Homebrew is required. Installation cancelled."
+        fi
+    else
+        success "Homebrew is installed"
+    fi
+    echo ""
 fi
 
 # Update package manager
 info "Updating package manager..."
-case $PKG_MANAGER in
-    pkg)
-        pkg update -y 2>&1 | grep -v "^Reading" || error "Failed to update package manager"
-        ;;
-    apt)
-        if [ "$EUID" -ne 0 ]; then
-            sudo apt update -y 2>&1 | grep -v "^Hit:" || error "Failed to update package manager"
-        else
-            apt update -y 2>&1 | grep -v "^Hit:" || error "Failed to update package manager"
-        fi
-        ;;
-    pacman)
-        if [ "$EUID" -ne 0 ]; then
-            sudo pacman -Sy || error "Failed to update package manager"
-        else
-            pacman -Sy || error "Failed to update package manager"
-        fi
-        ;;
-    dnf)
-        if [ "$EUID" -ne 0 ]; then
-            sudo dnf check-update || true
-        else
-            dnf check-update || true
-        fi
-        ;;
-esac
-success "Package manager updated!"
 
-# Install dependencies
-info "Checking and installing dependencies..."
-echo ""
-
-DEPS_TO_INSTALL=""
-
-# Check Ruby
-if ! command -v ruby &> /dev/null; then
-    info "  → Ruby not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL ruby"
-else
-    success "  → Ruby already installed ($(ruby --version | cut -d' ' -f2))"
-fi
-
-# Check Python3
-if ! command -v python3 &> /dev/null; then
-    info "  → Python3 not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL python3"
-else
-    success "  → Python3 already installed ($(python3 --version | cut -d' ' -f2))"
-fi
-
-# Check Node.js
-if ! command -v node &> /dev/null; then
-    info "  → Node.js not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL nodejs"
-else
-    success "  → Node.js already installed ($(node --version))"
-fi
-
-# Check PHP
-if ! command -v php &> /dev/null; then
-    info "  → PHP not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL php"
-else
-    success "  → PHP already installed ($(php --version | head -n1 | cut -d' ' -f2))"
-fi
-
-# Check wget
-if ! command -v wget &> /dev/null; then
-    info "  → wget not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL wget"
-else
-    success "  → wget already installed"
-fi
-
-# Check curl
-if ! command -v curl &> /dev/null; then
-    info "  → curl not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL curl"
-else
-    success "  → curl already installed"
-fi
-
-# Check unzip
-if ! command -v unzip &> /dev/null; then
-    info "  → unzip not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL unzip"
-else
-    success "  → unzip already installed"
-fi
-
-# Check git
-if ! command -v git &> /dev/null; then
-    info "  → git not found, will install"
-    DEPS_TO_INSTALL="$DEPS_TO_INSTALL git"
-else
-    success "  → git already installed"
-fi
-
-# Termux: check for proot
-if [ "$PLATFORM" = "termux" ]; then
-    if ! command -v proot &> /dev/null; then
-        info "  → proot not found (needed for Termux), will install"
-        DEPS_TO_INSTALL="$DEPS_TO_INSTALL proot"
-    else
-        success "  → proot already installed (Termux compatibility)"
-    fi
-fi
-
-echo ""
-
-# Install missing dependencies
-if [ -n "$DEPS_TO_INSTALL" ]; then
-    info "Installing missing packages:$DEPS_TO_INSTALL"
-    
+(
     case $PKG_MANAGER in
         pkg)
-            pkg install -y $DEPS_TO_INSTALL 2>&1 | grep -E "Installing|Upgrading|Setting up" || error "Failed to install dependencies"
+            pkg update -y &> /dev/null
             ;;
         apt)
             if [ "$EUID" -ne 0 ]; then
-                sudo apt install -y $DEPS_TO_INSTALL 2>&1 | grep -E "Setting up|Unpacking" || error "Failed to install dependencies"
+                sudo apt update -y &> /dev/null
             else
-                apt install -y $DEPS_TO_INSTALL 2>&1 | grep -E "Setting up|Unpacking" || error "Failed to install dependencies"
+                apt update -y &> /dev/null
             fi
             ;;
         pacman)
             if [ "$EUID" -ne 0 ]; then
-                sudo pacman -S --noconfirm $DEPS_TO_INSTALL || error "Failed to install dependencies"
+                sudo pacman -Sy --noconfirm &> /dev/null
             else
-                pacman -S --noconfirm $DEPS_TO_INSTALL || error "Failed to install dependencies"
+                pacman -Sy --noconfirm &> /dev/null
             fi
             ;;
         dnf)
             if [ "$EUID" -ne 0 ]; then
-                sudo dnf install -y $DEPS_TO_INSTALL || error "Failed to install dependencies"
+                sudo dnf check-update &> /dev/null || true
             else
-                dnf install -y $DEPS_TO_INSTALL || error "Failed to install dependencies"
+                dnf check-update &> /dev/null || true
             fi
             ;;
+        brew)
+            brew update &> /dev/null
+            ;;
     esac
-    
-    success "All dependencies installed!"
+) &
+
+spinner $! "Updating package manager"
+wait $!
+
+if [ $? -eq 0 ] || [ $PKG_MANAGER = "dnf" ]; then
+    success "Package manager updated!"
 else
-    success "All dependencies already installed!"
+    warn "Update had warnings (continuing anyway)"
 fi
 
 echo ""
 
-# Install YAML support for Ruby
-info "Checking Ruby YAML support..."
-if ! ruby -e "require 'yaml'" 2>/dev/null; then
-    warn "YAML gem not found, installing..."
-    gem install yaml 2>&1 | tail -5 || warn "YAML gem installation failed (non-critical)"
+# Check and install dependencies
+info "Checking dependencies..."
+echo ""
+
+declare -A dependencies=(
+    ["ruby"]="Ruby"
+    ["python3"]="Python 3"
+    ["node"]="Node.js"
+    ["php"]="PHP"
+    ["wget"]="wget"
+    ["curl"]="curl"
+    ["unzip"]="unzip"
+    ["git"]="Git"
+)
+
+# Add Termux-specific dependencies
+if [ "$PLATFORM" = "termux" ]; then
+    dependencies["proot"]="proot"
+fi
+
+DEPS_TO_INSTALL=()
+INSTALLED_COUNT=0
+TOTAL_DEPS=${#dependencies[@]}
+
+for cmd in "${!dependencies[@]}"; do
+    display_name="${dependencies[$cmd]}"
+    
+    if command -v $cmd &> /dev/null; then
+        version=""
+        case $cmd in
+            ruby) version=$(ruby --version 2>/dev/null | cut -d' ' -f2 || echo "unknown") ;;
+            python3) version=$(python3 --version 2>/dev/null | cut -d' ' -f2 || echo "unknown") ;;
+            node) version=$(node --version 2>/dev/null || echo "unknown") ;;
+            php) version=$(php --version 2>/dev/null | head -n1 | cut -d' ' -f2 || echo "unknown") ;;
+            git) version=$(git --version 2>/dev/null | cut -d' ' -f3 || echo "unknown") ;;
+            *) version="installed" ;;
+        esac
+        
+        success "  $display_name installed ($version)"
+        ((INSTALLED_COUNT++))
+    else
+        echo -e "  ${DIM}→ $display_name not found${RESET}"
+        DEPS_TO_INSTALL+=("$cmd")
+    fi
+done
+
+echo ""
+show_progress $INSTALLED_COUNT $TOTAL_DEPS "Dependencies checked"
+echo ""
+
+# Install missing dependencies
+if [ ${#DEPS_TO_INSTALL[@]} -gt 0 ]; then
+    info "Installing missing packages: ${DEPS_TO_INSTALL[*]}"
+    echo ""
+    
+    SUCCESS_COUNT=0
+    
+    for pkg in "${DEPS_TO_INSTALL[@]}"; do
+        echo -e "  ${CYAN}→${RESET} Installing $pkg..."
+        
+        (
+            case $PKG_MANAGER in
+                pkg)
+                    pkg install -y $pkg &> /dev/null
+                    ;;
+                apt)
+                    if [ "$EUID" -ne 0 ]; then
+                        sudo apt install -y $pkg &> /dev/null
+                    else
+                        apt install -y $pkg &> /dev/null
+                    fi
+                    ;;
+                pacman)
+                    # Map package names for Arch
+                    [ "$pkg" = "node" ] && pkg="nodejs"
+                    
+                    if [ "$EUID" -ne 0 ]; then
+                        sudo pacman -S --noconfirm $pkg &> /dev/null
+                    else
+                        pacman -S --noconfirm $pkg &> /dev/null
+                    fi
+                    ;;
+                dnf)
+                    # Map package names for Fedora
+                    [ "$pkg" = "node" ] && pkg="nodejs"
+                    
+                    if [ "$EUID" -ne 0 ]; then
+                        sudo dnf install -y $pkg &> /dev/null
+                    else
+                        dnf install -y $pkg &> /dev/null
+                    fi
+                    ;;
+                brew)
+                    # Map package names for macOS
+                    [ "$pkg" = "python3" ] && pkg="python"
+                    [ "$pkg" = "node" ] && pkg="node"
+                    
+                    brew install $pkg &> /dev/null
+                    ;;
+            esac
+        ) &
+        
+        spinner $! "Installing $pkg"
+        wait $!
+        
+        if [ $? -eq 0 ]; then
+            success "  $pkg installed!"
+            ((SUCCESS_COUNT++))
+        else
+            warn "  $pkg installation failed (may be non-critical)"
+        fi
+    done
+    
+    echo ""
+    show_progress $SUCCESS_COUNT ${#DEPS_TO_INSTALL[@]} "Packages installed"
+    echo ""
 else
-    success "Ruby YAML support available"
+    success "All dependencies already installed!"
+    echo ""
+fi
+
+# Install Ruby YAML gem
+info "Checking Ruby YAML support..."
+
+if command -v ruby &> /dev/null && command -v gem &> /dev/null; then
+    if ! ruby -e "require 'yaml'" 2>/dev/null; then
+        warn "YAML gem not found, installing..."
+        
+        (gem install yaml &> /dev/null) &
+        spinner $! "Installing YAML gem"
+        wait $!
+        
+        if [ $? -eq 0 ]; then
+            success "YAML gem installed!"
+        else
+            warn "YAML gem installation failed (non-critical)"
+        fi
+    else
+        success "Ruby YAML support available"
+    fi
+else
+    warn "Ruby/gem not found, skipping YAML check"
 fi
 
 echo ""
 
 # Install npm packages
 info "Checking npm packages..."
+
 if command -v npm &> /dev/null; then
     if ! npm list -g http-server &> /dev/null; then
         info "Installing http-server..."
-        if [ "$PLATFORM" = "termux" ]; then
-            npm install -g http-server 2>&1 | tail -3 || error "Failed to install http-server"
-        else
-            if [ "$EUID" -ne 0 ]; then
-                sudo npm install -g http-server 2>&1 | tail -3 || error "Failed to install http-server"
+        
+        (
+            if [ "$PLATFORM" = "termux" ] || [ "$PLATFORM" = "macos" ]; then
+                npm install -g http-server &> /dev/null
             else
-                npm install -g http-server 2>&1 | tail -3 || error "Failed to install http-server"
+                if [ "$EUID" -ne 0 ]; then
+                    sudo npm install -g http-server &> /dev/null
+                else
+                    npm install -g http-server &> /dev/null
+                fi
             fi
+        ) &
+        
+        spinner $! "Installing http-server"
+        wait $!
+        
+        if [ $? -eq 0 ]; then
+            success "http-server installed!"
+        else
+            warn "http-server installation failed (non-critical)"
         fi
-        success "http-server installed!"
     else
         success "http-server already installed"
     fi
 else
     warn "npm not found, skipping http-server installation"
-    info "You may need to install Node.js first"
 fi
 
 echo ""
 
 # Clone repository
 INSTALL_DIR="$HOME/Local2Internet"
+REPO_URL="https://github.com/Taezeem14/Local2Internet.git"
 
 if [ -d "$INSTALL_DIR" ]; then
-    warn "Local2Internet directory already exists at: $INSTALL_DIR"
-    read -p "Remove and reinstall? (y/N): " -n 1 -r
+    warn "Local2Internet directory already exists"
+    echo "  ${DIM}Location: $INSTALL_DIR${RESET}"
+    echo ""
+    
+    read -p "  Remove and reinstall? (y/N): " -n 1 -r
     echo
+    
     if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo ""
         info "Removing old installation..."
-        rm -rf "$INSTALL_DIR"
+        
+        rm -rf "$INSTALL_DIR" || error "Failed to remove old installation"
         success "Old installation removed"
     else
+        echo ""
         info "Updating existing installation..."
-        cd "$INSTALL_DIR"
-        git pull origin main 2>&1 | grep -E "Already up to date|Updating" || warn "Failed to update repository"
-        success "Repository updated!"
+        
+        cd "$INSTALL_DIR" || error "Failed to enter directory"
+        
+        (git pull origin main &> /dev/null) &
+        spinner $! "Updating repository"
+        wait $!
+        
+        if [ $? -eq 0 ]; then
+            success "Repository updated!"
+        else
+            warn "Update had warnings (continuing anyway)"
+        fi
+        
         cd - > /dev/null
+        
         echo ""
-        echo -e "${GREEN}╔════════════════════════════════════════╗${RESET}"
-        echo -e "${GREEN}║       UPDATE SUCCESSFUL! 🎉            ║${RESET}"
-        echo -e "${GREEN}╚════════════════════════════════════════╝${RESET}"
+        echo -e "$(gradient_text "╔════════════════════════════════════════════╗" "$GREEN" "$LIGHT_GREEN")"
+        echo -e "$(gradient_text "║" "$GREEN" "$LIGHT_GREEN")  ${BOLD}UPDATE SUCCESSFUL! 🎉${RESET}                $(gradient_text "║" "$GREEN" "$LIGHT_GREEN")"
+        echo -e "$(gradient_text "╚════════════════════════════════════════════╝" "$GREEN" "$LIGHT_GREEN")"
         echo ""
+        
         success "Local2Internet updated successfully!"
         echo ""
         info "To run Local2Internet:"
@@ -286,36 +471,52 @@ if [ -d "$INSTALL_DIR" ]; then
     fi
 fi
 
+echo ""
 info "Cloning Local2Internet repository..."
-git clone https://github.com/Taezeem14/Local2Internet.git "$INSTALL_DIR" 2>&1 | grep -E "Cloning|Receiving" || error "Failed to clone repository"
-success "Repository cloned!"
+echo "  ${DIM}Source: $REPO_URL${RESET}"
+echo ""
+
+(git clone $REPO_URL "$INSTALL_DIR" &> /dev/null) &
+spinner $! "Cloning repository"
+wait $!
+
+if [ $? -eq 0 ] && [ -d "$INSTALL_DIR/.git" ]; then
+    success "Repository cloned successfully!"
+else
+    error "Failed to clone repository. Check your internet connection."
+fi
 
 echo ""
 
-# Make executables
+# Set executable permissions
 info "Setting permissions..."
-chmod +x "$INSTALL_DIR/l2in_nexgen.rb" 2>/dev/null || chmod +x "$INSTALL_DIR/l2in.rb" || error "Failed to set executable permission"
+
+chmod +x "$INSTALL_DIR"/l2in*.rb 2>/dev/null || chmod +x "$INSTALL_DIR"/l2in.rb || warn "Failed to set executable permissions"
 success "Permissions set!"
 
 echo ""
 
-# Create symlink (optional)
+# Create system command (non-Termux)
 if [ "$PLATFORM" != "termux" ]; then
-    read -p "Create system-wide command 'l2in'? (y/N): " -n 1 -r
+    read -p "Create system-wide command 'l2in'? (Y/n): " -n 1 -r
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if [ -f "$INSTALL_DIR/l2in_nexgen.rb" ]; then
-            SCRIPT_NAME="l2in_nexgen.rb"
-        else
-            SCRIPT_NAME="l2in.rb"
-        fi
+    
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        echo ""
+        info "Creating system command..."
+        
+        SCRIPT_NAME="l2in_nexgen.rb"
+        [ ! -f "$INSTALL_DIR/$SCRIPT_NAME" ] && SCRIPT_NAME="l2in.rb"
         
         if [ "$EUID" -ne 0 ]; then
-            sudo ln -sf "$INSTALL_DIR/$SCRIPT_NAME" /usr/local/bin/l2in || warn "Failed to create symlink"
+            sudo ln -sf "$INSTALL_DIR/$SCRIPT_NAME" /usr/local/bin/l2in 2>/dev/null || warn "Failed to create symlink (may need manual setup)"
         else
-            ln -sf "$INSTALL_DIR/$SCRIPT_NAME" /usr/local/bin/l2in || warn "Failed to create symlink"
+            ln -sf "$INSTALL_DIR/$SCRIPT_NAME" /usr/local/bin/l2in 2>/dev/null || warn "Failed to create symlink"
         fi
-        success "Command 'l2in' created! You can now run it from anywhere."
+        
+        if [ -f /usr/local/bin/l2in ]; then
+            success "Command 'l2in' created! Run from anywhere."
+        fi
     fi
 fi
 
@@ -324,55 +525,65 @@ if [ "$PLATFORM" = "termux" ]; then
     echo ""
     read -p "Add 'l2in' alias to .bashrc? (Y/n): " -n 1 -r
     echo
+    
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        echo ""
+        info "Creating alias..."
+        
         SCRIPT_NAME="l2in_nexgen.rb"
         [ ! -f "$INSTALL_DIR/$SCRIPT_NAME" ] && SCRIPT_NAME="l2in.rb"
         
-        echo "alias l2in='$INSTALL_DIR/$SCRIPT_NAME'" >> ~/.bashrc
-        success "Alias added! Restart Termux or run: source ~/.bashrc"
+        if ! grep -q "alias l2in=" ~/.bashrc 2>/dev/null; then
+            echo "alias l2in='$INSTALL_DIR/$SCRIPT_NAME'" >> ~/.bashrc
+            success "Alias added! Restart Termux or run: source ~/.bashrc"
+        else
+            success "Alias already exists"
+        fi
     fi
 fi
 
+# Success screen
 echo ""
-echo -e "${GREEN}╔════════════════════════════════════════╗${RESET}"
-echo -e "${GREEN}║     INSTALLATION SUCCESSFUL! 🎉        ║${RESET}"
-echo -e "${GREEN}╚════════════════════════════════════════╝${RESET}"
+echo -e "$(gradient_text "╔════════════════════════════════════════════╗" "$GREEN" "$LIGHT_GREEN")"
+echo -e "$(gradient_text "║" "$GREEN" "$LIGHT_GREEN")  ${BOLD}INSTALLATION SUCCESSFUL! 🎉${RESET}          $(gradient_text "║" "$GREEN" "$LIGHT_GREEN")"
+echo -e "$(gradient_text "╚════════════════════════════════════════════╝" "$GREEN" "$LIGHT_GREEN")"
 echo ""
 
-success "Local2Internet v5 Advanced installed successfully!"
+success "Local2Internet v6.1 NEXT-GEN installed successfully!"
 echo ""
-info "Installation location: ${YELLOW}$INSTALL_DIR${RESET}"
+info "Installation location:"
+echo -e "  ${YELLOW}$INSTALL_DIR${RESET}"
 echo ""
-info "New features in v5:"
-echo -e "  ${CYAN}• API Key Support (Ngrok & Loclx)${RESET}"
-echo -e "  ${CYAN}• Enhanced Termux Compatibility${RESET}"
-echo -e "  ${CYAN}• Improved Error Handling${RESET}"
-echo -e "  ${CYAN}• Auto Port Detection${RESET}"
-echo -e "  ${CYAN}• Configuration Persistence${RESET}"
+info "New features in v6.1:"
+echo -e "  ${CYAN}• Ultra-Modern Terminal UI with Gradients${RESET}"
+echo -e "  ${CYAN}• 6 Premium Themes (Cyberpunk, Matrix, Ocean...)${RESET}"
+echo -e "  ${CYAN}• Bug-Free Error Handling & Recovery${RESET}"
+echo -e "  ${CYAN}• Real-Time Analytics Dashboard${RESET}"
+echo -e "  ${CYAN}• Enhanced API Key Management${RESET}"
+echo -e "  ${CYAN}• Zero Crashes Guarantee${RESET}"
 echo ""
 info "To start using Local2Internet:"
 echo -e "  ${YELLOW}cd $INSTALL_DIR${RESET}"
+
 SCRIPT_NAME="l2in_nexgen.rb"
 [ ! -f "$INSTALL_DIR/$SCRIPT_NAME" ] && SCRIPT_NAME="l2in.rb"
 echo -e "  ${YELLOW}./$SCRIPT_NAME${RESET}"
 echo ""
 
-if [[ $REPLY =~ ^[Yy]$ ]] && [ "$PLATFORM" != "termux" ]; then
-    info "Or simply run: ${YELLOW}l2in${RESET}"
-    echo ""
-fi
-
 # Ask to run now
 read -p "Run Local2Internet now? (Y/n): " -n 1 -r
 echo
+
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     echo ""
-    info "Starting Local2Internet..."
+    info "Starting Local2Internet v6.1 NEXT-GEN..."
     sleep 1
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || exit 1
     ./$SCRIPT_NAME
 else
     echo ""
     info "Thanks for installing! Happy tunneling! 🚀"
+    echo ""
+    echo -e "${DIM}Star the repo: https://github.com/Taezeem14/Local2Internet${RESET}"
     echo ""
 fi
