@@ -224,53 +224,63 @@ info "Installing Loclx (LocalXpose)..."
 LOC_DIR="$HOME/.local2internet/tools"
 mkdir -p "$LOC_DIR"
 
-ARCH=$(uname -m)
-LOC_URL=""
+# Check if already installed
+if [ -f "$LOC_DIR/loclx" ] && [ -x "$LOC_DIR/loclx" ]; then
+    success "Loclx already installed at $LOC_DIR/loclx"
+else
+    ARCH=$(uname -m)
+    LOC_URL=""
 
-case "$ARCH" in
-    aarch64|armv8*) 
-        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm64.zip"
-        ;;
-    armv7l|armv6l) 
-        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm.zip"
-        ;;
-    x86_64) 
-        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-amd64.zip"
-        ;;
-    i386|i686) 
-        LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-386.zip"
-        ;;
-    *) 
-        warn "Unsupported architecture: $ARCH"
-        LOC_URL=""
-        ;;
-esac
+    case "$ARCH" in
+        aarch64|armv8*) 
+            LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm64.zip"
+            ;;
+        armv7l|armv6l) 
+            LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm.zip"
+            ;;
+        x86_64) 
+            LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-amd64.zip"
+            ;;
+        i386|i686) 
+            LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-386.zip"
+            ;;
+        *) 
+            warn "Unsupported architecture: $ARCH"
+            LOC_URL=""
+            ;;
+    esac
 
-if [ -n "$LOC_URL" ]; then
-    info "Downloading Loclx for $ARCH..."
-    wget -L -O "$LOC_DIR/loclx.zip" "$LOC_URL" || {
-        error "Download failed"
-        exit 1
-    }
+    if [ -n "$LOC_URL" ]; then
+        info "Downloading Loclx for $ARCH..."
+        wget -q --show-progress -O "$LOC_DIR/loclx.zip" "$LOC_URL" || {
+            error "Loclx download failed"
+        }
 
-    info "Extracting Loclx..."
-    unzip -o "$LOC_DIR/loclx.zip" -d "$LOC_DIR" >/dev/null 2>&1 || {
-        error "Extraction failed"
-        exit 1
-    }
+        info "Extracting Loclx..."
+        unzip -q -o "$LOC_DIR/loclx.zip" -d "$LOC_DIR" || {
+            error "Loclx extraction failed"
+        }
 
-    # Find the loclx binary even if inside a folder
-    LOCLX_BIN=$(find "$LOC_DIR" -type f -name "loclx" | head -n 1)
+        # Find the loclx binary (might be in a subdirectory)
+        LOCLX_BIN=$(find "$LOC_DIR" -type f -name "loclx" 2>/dev/null | head -n 1)
 
-    if [ -n "$LOCLX_BIN" ]; then
-        chmod +x "$LOC_DIR/loclx"
-        success "Loclx installed at $LOC_DIR/loclx"
-    else
-        error "Loclx binary not found after extraction"
-        exit 1
+        if [ -n "$LOCLX_BIN" ]; then
+            # Move to correct location if not already there
+            if [ "$LOCLX_BIN" != "$LOC_DIR/loclx" ]; then
+                mv "$LOCLX_BIN" "$LOC_DIR/loclx"
+            fi
+            
+            chmod +x "$LOC_DIR/loclx"
+            success "Loclx installed at $LOC_DIR/loclx"
+        else
+            error "Loclx binary not found after extraction"
+        fi
+
+        # Cleanup
+        rm -f "$LOC_DIR/loclx.zip"
+        # Remove any subdirectories created during extraction
+        find "$LOC_DIR" -mindepth 1 -type d -exec rm -rf {} + 2>/dev/null || true
     fi
-
-    rm -f "$LOC_DIR/loclx.zip"
 fi
 # === END LOCLX INSTALL ===
 
