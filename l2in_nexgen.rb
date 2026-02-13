@@ -162,23 +162,23 @@ end
 
 # ------------------ UTILITIES ------------------
 
-def success(msg, icon = "✓ ")
+def success(msg, icon = "-✓-")
   puts "#{BGREEN}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
-def info(msg, icon = "ℹ")
+def info(msg, icon = "-ℹ-")
   puts "#{BCYAN}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
-def warn(msg, icon = "⚠ ")
+def warn(msg, icon = "-⚠-")
   puts "#{BYELLOW}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
-def error(msg, icon = "✗ ")
+def error(msg, icon = "-✗-")
   puts "#{BRED}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
-def ask(msg, icon = "❯ ")
+def ask(msg, icon = "--❯")
   print "#{BYELLOW}[#{icon}]#{BWHITE} #{msg}#{RESET}"
 end
 
@@ -650,15 +650,25 @@ class ToolDownloader
   end
 
   def self.download_loclx
-    url = "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-linux-amd64.zip"
-    tmp = "#{BASE_DIR}/loclx.zip"
+    # Determine correct architecture-specific binary
+    url = case arch
+    when /arm(?!64)/ then "https://loclx.io/release/latest/loclx_linux_arm.tar.gz"
+    when /aarch64|arm64/ then "https://loclx.io/release/latest/loclx_linux_arm64.tar.gz"
+    when /x86_64/ then "https://loclx.io/release/latest/loclx_linux_amd64.tar.gz"
+    else "https://loclx.io/release/latest/loclx_linux_386.tar.gz"
+    end
+    
+    tmp = "#{BASE_DIR}/loclx.tmp"
 
     return false unless exec_silent("wget -q #{url} -O #{tmp}")
-    return false unless exec_silent("unzip -q -o #{tmp} -d #{BIN_DIR}")
+    return false unless exec_silent("tar -xzf #{tmp} -C #{BIN_DIR}")
     
+    # The extracted binary might be named 'loclx' already
+    exec_silent("mv #{BIN_DIR}/loclx #{TOOLS[:loclx]} 2>/dev/null")
     exec_silent("chmod +x #{TOOLS[:loclx]}")
+    
     File.delete(tmp) rescue nil
-    true
+    File.exist?(TOOLS[:loclx])
   end
 end
 
@@ -1188,7 +1198,7 @@ class CLI
 
   def display_results(urls)
     puts ""
-    UI.header("🌍 PUBLIC URLS READY")
+    UI.header(" 🌍 PUBLIC URLS READY")
     
     active_tunnels = urls.select { |_, url| url }
     
