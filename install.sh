@@ -228,19 +228,19 @@ ARCH=$(uname -m)
 LOC_URL=""
 
 case "$ARCH" in
-    aarch64|armv8*)
+    aarch64|armv8*) 
         LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm64.zip"
         ;;
-    armv7l|armv6l)
+    armv7l|armv6l) 
         LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-arm.zip"
         ;;
-    x86_64)
+    x86_64) 
         LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-amd64.zip"
         ;;
-    i386|i686)
+    i386|i686) 
         LOC_URL="https://loclx-client.s3.amazonaws.com/loclx-linux-386.zip"
         ;;
-    *)
+    *) 
         warn "Unsupported architecture: $ARCH"
         LOC_URL=""
         ;;
@@ -253,20 +253,13 @@ if [ -n "$LOC_URL" ]; then
         exit 1
     }
 
-    # Verify it's actually a zip
-    if ! file "$LOC_DIR/loclx.zip" | grep -q "Zip archive"; then
-        error "Downloaded file is not a valid zip"
-        rm -f "$LOC_DIR/loclx.zip"
-        exit 1
-    fi
-
     info "Extracting Loclx..."
     unzip -o "$LOC_DIR/loclx.zip" -d "$LOC_DIR" >/dev/null 2>&1 || {
         error "Extraction failed"
         exit 1
     }
 
-    # Find the loclx binary even if inside folder
+    # Find the loclx binary even if inside a folder
     LOCLX_BIN=$(find "$LOC_DIR" -type f -name "loclx" | head -n 1)
 
     if [ -n "$LOCLX_BIN" ]; then
