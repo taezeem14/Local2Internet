@@ -128,15 +128,13 @@ end
 include Colors
 
 # ==================== THEME ENGINE ====================
-
-# ==================== THEME ENGINE ====================
+def rgb(r, g, b)
+  "\e[38;2;#{r};#{g};#{b}m"
+end
+private :rgb
 
 class ThemeEngine
   attr_reader :current_theme
-
-  def self.rgb(r, g, b)
-  "\e[38;2;#{r};#{g};#{b}m"
-end
   
   THEMES = {
     cyberpunk: {
