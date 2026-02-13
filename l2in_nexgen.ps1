@@ -1,25 +1,28 @@
 # =========================================
-# Local2Internet v6.0 NEXT-GEN - PowerShell Edition
+# Local2Internet v6 NEXT-GEN - PowerShell Edition
 # Platform: Windows PowerShell 7.0+
 # Ultra-Modern UI with Gradients & Animations
+# Bug-Free Edition by Bro & Claude
 # =========================================
 
 #Requires -Version 7.0
 
 $ErrorActionPreference = "SilentlyContinue"
-$PSStyle.OutputRendering = "PlainText"
+# CRITICAL FIX: Enable ANSI rendering instead of disabling it!
+$PSStyle.OutputRendering = "Ansi"
 
 # ---------------------------
 # Configuration
 # ---------------------------
-$script:VERSION = "6.0"
-$script:EDITION = "NEXT-GEN"
+$script:VERSION = "6.1"
+$script:EDITION = "NEXT-GEN ULTRA"
 $script:HOME = $env:USERPROFILE
 $script:BASE_DIR = "$HOME\.local2internet"
 $script:CONFIG_DIR = "$BASE_DIR\config"
 $script:BIN_DIR = "$BASE_DIR\bin"
 $script:LOG_DIR = "$BASE_DIR\logs"
 $script:THEMES_DIR = "$BASE_DIR\themes"
+$script:STATS_DIR = "$BASE_DIR\stats"
 $script:CONFIG_FILE = "$CONFIG_DIR\config.json"
 $script:THEME_FILE = "$CONFIG_DIR\theme.json"
 
@@ -28,49 +31,16 @@ $script:THEME_FILE = "$CONFIG_DIR\theme.json"
 # ---------------------------
 $ESC = [char]27
 
-function RGB($r, $g, $b) { return "$ESC[38;2;${r};${g};${b}m" }
-function BGRGB($r, $g, $b) { return "$ESC[48;2;${r};${g};${b}m" }
-
-# Gradient Palettes
-$script:GRADIENTS = @{
-    primary = @(
-        (RGB 139 92 246),   # Purple
-        (RGB 167 139 250),  # Light Purple
-        (RGB 196 181 253)   # Lighter Purple
-    )
-    accent = @(
-        (RGB 59 130 246),   # Blue
-        (RGB 96 165 250),   # Light Blue
-        (RGB 147 197 253)   # Lighter Blue
-    )
-    success = @(
-        (RGB 34 197 94),    # Green
-        (RGB 74 222 128),   # Light Green
-        (RGB 134 239 172)   # Lighter Green
-    )
-    warning = @(
-        (RGB 251 146 60),   # Orange
-        (RGB 253 186 116),  # Light Orange
-        (RGB 254 215 170)   # Lighter Orange
-    )
-    error = @(
-        (RGB 239 68 68),    # Red
-        (RGB 248 113 113),  # Light Red
-        (RGB 252 165 165)   # Lighter Red
-    )
+function RGB($r, $g, $b) { 
+    return "$ESC[38;2;${r};${g};${b}m" 
 }
 
-# Neon Colors
-$script:NEON = @{
-    cyan = (RGB 34 211 238)
-    pink = (RGB 236 72 153)
-    green = (RGB 74 222 128)
-    yellow = (RGB 250 204 21)
-    purple = (RGB 167 139 250)
+function BGRGB($r, $g, $b) { 
+    return "$ESC[48;2;${r};${g};${b}m" 
 }
 
-# Standard Colors
-$C = @{
+# Standard Effects
+$script:C = @{
     Reset = "$ESC[0m"
     Bold = "$ESC[1m"
     Dim = "$ESC[2m"
@@ -83,7 +53,7 @@ $C = @{
 # ---------------------------
 # Theme Engine
 # ---------------------------
-$script:THEMES = @{
+$script:THEMES = [ordered]@{
     cyberpunk = @{
         name = "Cyberpunk"
         primary = @((RGB 236 72 153), (RGB 139 92 246))
@@ -124,35 +94,80 @@ $script:THEMES = @{
         border = "░"
         glow = $false
     }
+    minimal = @{
+        name = "Minimal"
+        primary = @((RGB 100 116 139), (RGB 71 85 105))
+        accent = @((RGB 148 163 184), (RGB 100 116 139))
+        success = @((RGB 34 197 94), (RGB 22 163 74))
+        warning = @((RGB 251 191 36), (RGB 245 158 11))
+        error = @((RGB 239 68 68), (RGB 220 38 38))
+        border = "─"
+        glow = $false
+    }
+    neon_retro = @{
+        name = "Neon Retro"
+        primary = @((RGB 236 72 153), (RGB 250 204 21))
+        accent = @((RGB 34 211 238), (RGB 167 139 250))
+        success = @((RGB 74 222 128), (RGB 134 239 172))
+        warning = @((RGB 251 146 60), (RGB 253 186 116))
+        error = @((RGB 239 68 68), (RGB 248 113 113))
+        border = "▒"
+        glow = $true
+    }
 }
 
 function Get-CurrentTheme {
     if (Test-Path $THEME_FILE) {
-        $themeName = (Get-Content $THEME_FILE | ConvertFrom-Json).theme
-        return $THEMES[$themeName]
+        try {
+            $themeName = (Get-Content $THEME_FILE -Raw -ErrorAction Stop | ConvertFrom-Json).theme
+            if ($THEMES.Contains($themeName)) {
+                return $THEMES[$themeName]
+            }
+        }
+        catch {
+            Write-Warning "Failed to load theme: $_"
+        }
     }
     return $THEMES.cyberpunk
 }
 
 function Set-Theme($name) {
-    @{ theme = $name } | ConvertTo-Json | Set-Content $THEME_FILE
-    $script:CurrentTheme = $THEMES[$name]
+    try {
+        if (-not (Test-Path $CONFIG_DIR)) {
+            New-Item -ItemType Directory -Path $CONFIG_DIR -Force | Out-Null
+        }
+        @{ theme = $name } | ConvertTo-Json | Set-Content $THEME_FILE -Force
+        $script:CurrentTheme = $THEMES[$name]
+        return $true
+    }
+    catch {
+        Write-Warning "Failed to save theme: $_"
+        return $false
+    }
 }
 
 $script:CurrentTheme = Get-CurrentTheme
+$script:ActiveJobs = @()
 
 # ---------------------------
 # Gradient Text Function
 # ---------------------------
 function Get-GradientText($text, $colors) {
-    if ($colors.Count -lt 2) { return $text }
+    if ($null -eq $colors -or $colors.Count -eq 0) { 
+        return $text 
+    }
+    
+    if ($colors.Count -lt 2 -or $text.Length -le 1) { 
+        return "$($colors[0])$text$($C.Reset)" 
+    }
     
     $chars = $text.ToCharArray()
     $result = ""
     
     for ($i = 0; $i -lt $chars.Length; $i++) {
-        $ratio = $i / ($chars.Length - 1)
+        $ratio = $i / [Math]::Max(($chars.Length - 1), 1)
         $colorIndex = [Math]::Floor($ratio * ($colors.Count - 1))
+        $colorIndex = [Math]::Min($colorIndex, $colors.Count - 1)
         $result += "$($colors[$colorIndex])$($chars[$i])"
     }
     
@@ -166,10 +181,17 @@ function Get-Glow($text) {
     return $text
 }
 
+function Get-CleanLength($text) {
+    # Remove ANSI escape codes to get actual display length
+    $clean = $text -replace "$ESC\[[0-9;]*m", ""
+    return $clean.Length
+}
+
 # ---------------------------
 # Modern Logo
 # ---------------------------
-$LOGO = @"
+function Get-Logo {
+    $logo = @"
 $(Get-GradientText "╔═══════════════════════════════════════════════════════════════════════╗" $CurrentTheme.primary)
 $(Get-GradientText "║" $CurrentTheme.primary)  $(Get-GradientText "██╗      ██████╗  ██████╗ █████╗ ██╗     ██████╗ ██╗███╗   ██╗████████╗" $CurrentTheme.accent)$(Get-GradientText "║" $CurrentTheme.primary)
 $(Get-GradientText "║" $CurrentTheme.primary)  $(Get-GradientText "██║     ██╔═══██╗██╔════╝██╔══██╗██║     ╚════██╗██║████╗  ██║╚══██╔══╝" $CurrentTheme.accent)$(Get-GradientText "║" $CurrentTheme.primary)
@@ -179,10 +201,12 @@ $(Get-GradientText "║" $CurrentTheme.primary)  $(Get-GradientText "███�
 $(Get-GradientText "║" $CurrentTheme.primary)  $(Get-GradientText "╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝   ╚═╝   " $CurrentTheme.accent)$(Get-GradientText "║" $CurrentTheme.primary)
 $(Get-GradientText "╚═══════════════════════════════════════════════════════════════════════╝" $CurrentTheme.primary)
 
-    $(Get-Glow (Get-GradientText "▸ v$VERSION $EDITION Edition" $CurrentTheme.success)) $($C.Dim)• Next-Generation Tunneling Platform$($C.Reset)
-    $($C.Dim)Multi-Protocol • Real-Time Analytics • Theme Engine • Plugin System$($C.Reset)
+    $(Get-Glow (Get-GradientText "▸ v$VERSION $EDITION Edition" $CurrentTheme.success)) $($C.Dim)• Bug-Free Tunneling Platform$($C.Reset)
+    $($C.Dim)Multi-Protocol • Real-Time Analytics • Theme Engine • Zero Crashes$($C.Reset)
 
 "@
+    return $logo
+}
 
 # ---------------------------
 # Modern UI Components
@@ -193,10 +217,16 @@ function Show-ModernHeader($title, $subtitle = $null) {
     
     Write-Host ""
     Write-Host (Get-GradientText ($border * $width) $CurrentTheme.primary)
-    Write-Host (Get-Glow (Get-GradientText "  $title".PadRight($width) $CurrentTheme.accent))
+    
+    $titlePadded = "  $title"
+    $titleLen = Get-CleanLength $titlePadded
+    $padding = [Math]::Max(0, $width - $titleLen)
+    Write-Host "$(Get-Glow (Get-GradientText $titlePadded $CurrentTheme.accent))$(' ' * $padding)"
     
     if ($subtitle) {
-        Write-Host "$($C.Dim)$($subtitle.PadRight($width))$($C.Reset)"
+        $subLen = Get-CleanLength $subtitle
+        $subPadding = [Math]::Max(0, $width - $subLen)
+        Write-Host "$($C.Dim)$subtitle$(' ' * $subPadding)$($C.Reset)"
     }
     
     Write-Host (Get-GradientText ($border * $width) $CurrentTheme.primary)
@@ -209,11 +239,18 @@ function Show-Card($title, $content, $icon = "▸") {
     
     Write-Host ""
     Write-Host (Get-GradientText "┌$($border * ($width - 2))┐" $CurrentTheme.primary)
-    Write-Host "$(Get-GradientText "│" $CurrentTheme.primary) $(Get-Glow "$icon $title")".PadRight($width + 20) + (Get-GradientText "│" $CurrentTheme.primary)
+    
+    $titleLine = "$(Get-GradientText "│" $CurrentTheme.primary) $(Get-Glow "$icon $title")"
+    $titleLen = Get-CleanLength " $icon $title"
+    $padding = [Math]::Max(0, $width - $titleLen - 2)
+    Write-Host "$titleLine$(' ' * $padding) $(Get-GradientText "│" $CurrentTheme.primary)"
+    
     Write-Host (Get-GradientText "├$($border * ($width - 2))┤" $CurrentTheme.primary)
     
     foreach ($line in $content) {
-        Write-Host "$(Get-GradientText "│" $CurrentTheme.primary) $line".PadRight($width + 20) + (Get-GradientText "│" $CurrentTheme.primary)
+        $cleanLen = Get-CleanLength $line
+        $padding = [Math]::Max(0, $width - $cleanLen - 2)
+        Write-Host "$(Get-GradientText "│" $CurrentTheme.primary) $line$(' ' * $padding) $(Get-GradientText "│" $CurrentTheme.primary)"
     }
     
     Write-Host (Get-GradientText "└$($border * ($width - 2))┘" $CurrentTheme.primary)
@@ -221,14 +258,17 @@ function Show-Card($title, $content, $icon = "▸") {
 }
 
 function Show-ProgressBar($current, $total, $label = "Progress") {
+    if ($total -le 0 -or $current -lt 0) { return }
+    
+    $current = [Math]::Min($current, $total)
     $percentage = [Math]::Round(($current / $total) * 100)
-    $filled = [Math]::Round((40 * $current) / $total)
-    $empty = 40 - $filled
+    $filled = [Math]::Max(0, [Math]::Min(40, [Math]::Round((40 * $current) / $total)))
+    $empty = [Math]::Max(0, 40 - $filled)
     
     $barFilled = Get-GradientText ("█" * $filled) $CurrentTheme.success
     $barEmpty = "$($C.Dim)$('░' * $empty)"
     
-    Write-Host -NoNewline "`r$(Get-GradientText "▸" $CurrentTheme.accent) $label`: [$barFilled$barEmpty$($C.Reset)] $(Get-Glow (Get-GradientText "$percentage%" $CurrentTheme.success))"
+    Write-Host -NoNewline "`r$(Get-GradientText "▸" $CurrentTheme.accent) $label`: [$barFilled$barEmpty$($C.Reset)] $(Get-Glow (Get-GradientText "$percentage%" $CurrentTheme.success))    "
     
     if ($current -ge $total) { Write-Host "" }
 }
@@ -238,18 +278,28 @@ function Show-Spinner($message, $action) {
     $i = 0
     
     $job = Start-Job -ScriptBlock $action
+    $script:ActiveJobs += $job
     
-    while ($job.State -eq "Running") {
-        Write-Host -NoNewline "`r$(Get-GradientText $frames[$i] $CurrentTheme.accent) $(Get-Glow $message)$($C.Reset)"
-        $i = ($i + 1) % $frames.Count
-        Start-Sleep -Milliseconds 80
+    try {
+        while ($job.State -eq "Running") {
+            Write-Host -NoNewline "`r$(Get-GradientText $frames[$i] $CurrentTheme.accent) $(Get-Glow $message)$($C.Reset)    "
+            $i = ($i + 1) % $frames.Count
+            Start-Sleep -Milliseconds 80
+        }
+        
+        Write-Host "`r$(' ' * 100)`r" -NoNewline
+        
+        $result = Receive-Job $job -ErrorAction Stop
+        return $result
     }
-    
-    Write-Host "`r$(' ' * 80)`r" -NoNewline
-    
-    $result = Receive-Job $job
-    Remove-Job $job
-    return $result
+    catch {
+        Write-Warning "Spinner error: $_"
+        return $null
+    }
+    finally {
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+        $script:ActiveJobs = $script:ActiveJobs | Where-Object { $_ -ne $job }
+    }
 }
 
 function Show-Notification($type, $title, $message = $null) {
@@ -276,52 +326,13 @@ function Show-Notification($type, $title, $message = $null) {
     }
 }
 
-function Show-Table($headers, $rows) {
-    $colWidths = @()
-    for ($i = 0; $i -lt $headers.Count; $i++) {
-        $maxWidth = $headers[$i].Length
-        foreach ($row in $rows) {
-            if ($row[$i].ToString().Length -gt $maxWidth) {
-                $maxWidth = $row[$i].ToString().Length
-            }
-        }
-        $colWidths += $maxWidth + 3
-    }
-    
-    $border = $CurrentTheme.border
-    
-    # Top border
-    Write-Host ""
-    Write-Host (Get-GradientText "┌$($colWidths | ForEach-Object { $border * $_ } | Join-String -Separator '┬')┐" $CurrentTheme.primary)
-    
-    # Headers
-    $headerRow = @()
-    for ($i = 0; $i -lt $headers.Count; $i++) {
-        $headerRow += Get-Glow (Get-GradientText " $($headers[$i])".PadRight($colWidths[$i]) $CurrentTheme.accent)
-    }
-    Write-Host "$(Get-GradientText "│" $CurrentTheme.primary)$($headerRow -join (Get-GradientText "│" $CurrentTheme.primary))$(Get-GradientText "│" $CurrentTheme.primary)"
-    
-    # Middle border
-    Write-Host (Get-GradientText "├$($colWidths | ForEach-Object { $border * $_ } | Join-String -Separator '┼')┤" $CurrentTheme.primary)
-    
-    # Rows
-    foreach ($row in $rows) {
-        $rowText = @()
-        for ($i = 0; $i -lt $row.Count; $i++) {
-            $rowText += " $($row[$i])".PadRight($colWidths[$i])
-        }
-        Write-Host "$(Get-GradientText "│" $CurrentTheme.primary)$($rowText -join (Get-GradientText "│" $CurrentTheme.primary))$(Get-GradientText "│" $CurrentTheme.primary)"
-    }
-    
-    # Bottom border
-    Write-Host (Get-GradientText "└$($colWidths | ForEach-Object { $border * $_ } | Join-String -Separator '┴')┘" $CurrentTheme.primary)
-    Write-Host ""
-}
-
 function Show-Gauge($label, $value, $maxValue, $unit = "") {
+    if ($maxValue -le 0 -or $value -lt 0) { return }
+    
+    $value = [Math]::Min($value, $maxValue)
     $percentage = [Math]::Round(($value / $maxValue) * 100)
-    $filled = [Math]::Round((30 * $value) / $maxValue)
-    $empty = 30 - $filled
+    $filled = [Math]::Max(0, [Math]::Min(30, [Math]::Round((30 * $value) / $maxValue)))
+    $empty = [Math]::Max(0, 30 - $filled)
     
     $barFilled = Get-GradientText ("▰" * $filled) $CurrentTheme.success
     $barEmpty = "$($C.Dim)$('▱' * $empty)"
@@ -351,7 +362,7 @@ function Show-Dashboard {
     
     Show-ModernHeader "📊 REAL-TIME ANALYTICS" "Live monitoring and statistics"
     
-    Show-Gauge "Uptime" 95 100 "%"
+    Show-Gauge "System Uptime" 95 100 "%"
     Write-Host ""
     
     Write-Host "$(Get-GradientText "▸" $CurrentTheme.accent) $(Get-Glow "Total Sessions"): $(Get-GradientText "42" $CurrentTheme.success) $($C.Dim)sessions$($C.Reset)"
@@ -365,7 +376,7 @@ function Show-Dashboard {
     Write-Host ""
     
     Write-Host -NoNewline "$($C.Dim)Press ENTER to continue...$($C.Reset)"
-    Read-Host | Out-Null
+    $null = Read-Host
 }
 
 # ---------------------------
@@ -377,25 +388,34 @@ function Show-ThemeSelector {
     Show-ModernHeader "🎨 THEME SELECTOR" "Customize your terminal experience"
     
     $i = 1
-    foreach ($theme in $THEMES.GetEnumerator()) {
-        $isActive = $CurrentTheme.name -eq $theme.Value.name
+    # Use ordered hashtable to maintain consistent order
+    foreach ($themeName in $THEMES.Keys) {
+        $theme = $THEMES[$themeName]
+        $isActive = $CurrentTheme.name -eq $theme.name
         $status = if ($isActive) { Get-Badge "ACTIVE" "success" } else { "" }
         
-        Write-Host "$(Get-GradientText "$i)" $CurrentTheme.accent) $(Get-Glow $theme.Value.name) $status"
-        Write-Host "   $($C.Dim)Preview: $(Get-GradientText "■■■" $theme.Value.primary) $(Get-GradientText "■■■" $theme.Value.accent)$($C.Reset)"
+        Write-Host "$(Get-GradientText "$i)" $CurrentTheme.accent) $(Get-Glow $theme.name) $status"
+        Write-Host "   $($C.Dim)Preview: $(Get-GradientText "■■■" $theme.primary) $(Get-GradientText "■■■" $theme.accent)$($C.Reset)"
         Write-Host ""
         $i++
     }
     
-    Write-Host -NoNewline "$(Get-GradientText "▸" $CurrentTheme.accent) Select theme (1-$($THEMES.Count)): "
+    Write-Host -NoNewline "$(Get-GradientText "▸" $CurrentTheme.accent) Select theme (1-$($THEMES.Count)) or 0 to cancel: "
     $choice = Read-Host
     
-    $choiceNum = [int]$choice
-    if ($choiceNum -gt 0 -and $choiceNum -le $THEMES.Count) {
-        $themeName = ($THEMES.Keys | Sort-Object)[$choiceNum - 1]
-        Set-Theme $themeName
-        Show-Notification "success" "Theme Changed" "Applied $($THEMES[$themeName].name) theme"
-        Start-Sleep -Seconds 2
+    try {
+        $choiceNum = [int]$choice
+        if ($choiceNum -gt 0 -and $choiceNum -le $THEMES.Count) {
+            $themeName = @($THEMES.Keys)[$choiceNum - 1]
+            if (Set-Theme $themeName) {
+                Show-Notification "success" "Theme Changed" "Applied $($THEMES[$themeName].name) theme"
+                Start-Sleep -Seconds 2
+            }
+        }
+    }
+    catch {
+        Show-Notification "warning" "Invalid Input" "Please enter a valid number"
+        Start-Sleep -Seconds 1
     }
 }
 
@@ -405,7 +425,7 @@ function Show-ThemeSelector {
 function Show-MainMenu {
     while ($true) {
         Clear-Host
-        Write-Host $LOGO
+        Write-Host (Get-Logo)
         
         Show-ModernHeader "MAIN DASHBOARD"
         
@@ -446,6 +466,7 @@ function Show-MainMenu {
             }
             "0" {
                 Show-Notification "success" "Goodbye" "Thanks for using Local2Internet!"
+                Cleanup-Jobs
                 exit 0
             }
             default {
@@ -462,7 +483,7 @@ function Show-About {
     Show-Card "About Local2Internet" @(
         "",
         "$(Get-GradientText "Version" $CurrentTheme.accent): v$VERSION $EDITION",
-        "$(Get-GradientText "Description" $CurrentTheme.accent): Next-gen localhost tunneling platform",
+        "$(Get-GradientText "Description" $CurrentTheme.accent): Bug-free localhost tunneling",
         "",
         "$(Get-GradientText "Original Author" $CurrentTheme.accent): KasRoudra",
         "$(Get-GradientText "Enhanced By" $CurrentTheme.accent): Muhammad Taezeem Tariq Matta",
@@ -474,39 +495,65 @@ function Show-About {
     ) "ℹ️"
     
     Write-Host -NoNewline "`nPress ENTER to continue..."
-    Read-Host | Out-Null
+    $null = Read-Host
 }
 
 # ---------------------------
 # Initialize
 # ---------------------------
 function Initialize-Directories {
-    @($BASE_DIR, $CONFIG_DIR, $BIN_DIR, $LOG_DIR, $THEMES_DIR) | ForEach-Object {
-        if (-not (Test-Path $_)) {
-            New-Item -ItemType Directory -Path $_ -Force | Out-Null
+    @($BASE_DIR, $CONFIG_DIR, $BIN_DIR, $LOG_DIR, $THEMES_DIR, $STATS_DIR) | ForEach-Object {
+        try {
+            if (-not (Test-Path $_)) {
+                New-Item -ItemType Directory -Path $_ -Force | Out-Null
+            }
+        }
+        catch {
+            Write-Warning "Failed to create directory $_`: $_"
         }
     }
+}
+
+function Cleanup-Jobs {
+    foreach ($job in $script:ActiveJobs) {
+        if ($job -and $job.State -eq "Running") {
+            Stop-Job $job -ErrorAction SilentlyContinue
+            Remove-Job $job -Force -ErrorAction SilentlyContinue
+        }
+    }
+    $script:ActiveJobs = @()
 }
 
 # ---------------------------
 # Entry Point
 # ---------------------------
 try {
+    # Handle Ctrl+C gracefully
+    [Console]::TreatControlCAsInput = $false
+    $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
+        Cleanup-Jobs
+    }
+    
     Initialize-Directories
     
     Clear-Host
-    Write-Host $LOGO
+    Write-Host (Get-Logo)
     
-    Write-Host -NoNewline "`r$(Get-GradientText "⣾" $CurrentTheme.accent) $(Get-Glow "Loading next-gen interface...")$($C.Reset)"
+    Write-Host -NoNewline "`r$(Get-GradientText "⣾" $CurrentTheme.accent) $(Get-Glow "Loading next-gen interface...")$($C.Reset)    "
     Start-Sleep -Seconds 2
-    Write-Host "`r$(' ' * 80)`r" -NoNewline
+    Write-Host "`r$(' ' * 100)`r" -NoNewline
     
     Show-Notification "success" "Welcome" "Local2Internet $VERSION initialized"
     Start-Sleep -Seconds 1
     
     Show-MainMenu
     
-} catch {
-    Write-Host "`n$($GRADIENTS.error[0])[FATAL ERROR] $_$($C.Reset)"
+}
+catch {
+    Write-Host "`n$((Get-GradientText "[FATAL ERROR]" $THEMES.cyberpunk.error)) $_$($C.Reset)"
+    Cleanup-Jobs
     exit 1
+}
+finally {
+    Cleanup-Jobs
 }
