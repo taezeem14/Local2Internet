@@ -218,6 +218,35 @@ fi
 
 echo ""
 
+# =========================================
+# Install Loclx (direct download)
+# =========================================
+TOOLS_DIR="$HOME/.local2internet_tools"
+mkdir -p "$TOOLS_DIR"
+
+info "Installing Loclx..."
+
+ARCH=$(uname -m)
+case $ARCH in
+    x86_64) ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    i386|i686) ARCH="386" ;;
+    *) error "Unsupported architecture for Loclx: $ARCH" ;;
+esac
+
+LOCLX_URL="https://github.com/localxpose/localxpose/releases/latest/download/loclx-linux-$ARCH.zip"
+LOCLX_ZIP="$TOOLS_DIR/loclx.zip"
+LOCLX_BIN="$TOOLS_DIR/loclx"
+
+info "Downloading Loclx ($ARCH)..."
+curl -L "$LOCLX_URL" -o "$LOCLX_ZIP" || error "Failed to download Loclx"
+
+info "Extracting Loclx..."
+unzip -o "$LOCLX_ZIP" -d "$TOOLS_DIR" >/dev/null || error "Failed to extract Loclx"
+chmod +x "$LOCLX_BIN"
+
+success "Loclx installed at $LOCLX_BIN ✅"
+
 # Install YAML support for Ruby
 info "Checking Ruby YAML support..."
 if ! ruby -e "require 'yaml'" 2>/dev/null; then
