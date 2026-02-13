@@ -1,1479 +1,1525 @@
-#!/usr/bin/env ruby
-# ==========================================================
-# Local2Internet v5.0 ULTIMATE - Next Generation Edition
-#
-# Description:
-#   Professional-grade localhost exposure tool with advanced
-#   monitoring, auto-recovery, modern UI, and enterprise features
-#
-# Original Author  : KasRoudra
-# Enhanced By      : Muhammad Taezeem Tariq Matta
-# Ultimate Edition : Claude AI Assistant
-# Repository       : github.com/Taezeem14/Local2Internet
-# License          : MIT
-# ==========================================================
+# =========================================
+# Local2Internet v5.0 ULTIMATE - Windows PowerShell Edition
+# Platform: Windows PowerShell 7.0+
+# Enhanced By: Muhammad Taezeem Tariq Matta
+# Ultimate Edition: Claude AI Assistant
+# =========================================
 
-require 'fileutils'
-require 'json'
-require 'yaml'
-require 'net/http'
-require 'uri'
-require 'socket'
-require 'timeout'
-require 'time'
+#Requires -Version 5.1
 
-# ------------------ CONFIGURATION ------------------
+$ErrorActionPreference = "SilentlyContinue"
+$ProgressPreference = 'SilentlyContinue'
 
-HOME = ENV["HOME"]
-BASE_DIR = "#{HOME}/.local2internet"
-LOG_DIR  = "#{BASE_DIR}/logs"
-BIN_DIR  = "#{BASE_DIR}/bin"
-STATS_DIR = "#{BASE_DIR}/stats"
-CONFIG_FILE = "#{BASE_DIR}/config.yml"
-SESSION_FILE = "#{BASE_DIR}/session.json"
+# ---------------------------
+# Configuration
+# ---------------------------
+$script:HOME = $env:USERPROFILE
+$script:BASE_DIR = "$HOME\.local2internet"
+$script:BIN_DIR = "$BASE_DIR\bin"
+$script:LOG_DIR = "$BASE_DIR\logs"
+$script:STATS_DIR = "$BASE_DIR\stats"
+$script:CONFIG_FILE = "$BASE_DIR\config.json"
+$script:SESSION_FILE = "$BASE_DIR\session.json"
+$script:DEFAULT_PORT = 8888
+$script:VERSION = "5.0"
+$script:EDITION = "ULTIMATE"
 
-TOOLS = {
-  ngrok: "#{BIN_DIR}/ngrok",
-  cloudflared: "#{BIN_DIR}/cloudflared",
-  loclx: "#{BIN_DIR}/loclx"
+# ---------------------------
+# Enhanced Colors (ANSI)
+# ---------------------------
+$ESC = [char]27
+$C = @{
+    # Standard colors
+    Red = "$ESC[31m"
+    Green = "$ESC[32m"
+    Yellow = "$ESC[33m"
+    Blue = "$ESC[34m"
+    Purple = "$ESC[35m"
+    Cyan = "$ESC[36m"
+    White = "$ESC[37m"
+    
+    # Bright colors
+    BRed = "$ESC[91m"
+    BGreen = "$ESC[92m"
+    BYellow = "$ESC[93m"
+    BBlue = "$ESC[94m"
+    BPurple = "$ESC[95m"
+    BCyan = "$ESC[96m"
+    BWhite = "$ESC[97m"
+    
+    # Formatting
+    Reset = "$ESC[0m"
+    Bold = "$ESC[1m"
+    Dim = "$ESC[2m"
+    Italic = "$ESC[3m"
+    Underline = "$ESC[4m"
 }
 
-DEPENDENCIES = %w[python3 php wget unzip curl]
-DEFAULT_PORT = 8888
-VERSION = "5.0"
-EDITION = "ULTIMATE"
+# ---------------------------
+# UI Functions
+# ---------------------------
+function Write-Info($msg, $icon = "ℹ") { 
+    Write-Host "$($C.BCyan)[$icon]$($C.BWhite) $msg$($C.Reset)" 
+}
 
-# ------------------ ENHANCED COLORS & UI ------------------
+function Write-Success($msg, $icon = "✓") { 
+    Write-Host "$($C.BGreen)[$icon]$($C.BWhite) $msg$($C.Reset)" 
+}
 
-module Colors
-  BLACK   = "\033[0;30m"
-  RED     = "\033[0;31m"
-  GREEN   = "\033[0;32m"
-  YELLOW  = "\033[0;33m"
-  BLUE    = "\033[0;34m"
-  PURPLE  = "\033[0;35m"
-  CYAN    = "\033[0;36m"
-  WHITE   = "\033[0;37m"
-  
-  # Bright variants
-  BRED    = "\033[1;31m"
-  BGREEN  = "\033[1;32m"
-  BYELLOW = "\033[1;33m"
-  BBLUE   = "\033[1;34m"
-  BPURPLE = "\033[1;35m"
-  BCYAN   = "\033[1;36m"
-  BWHITE  = "\033[1;37m"
-  
-  # Backgrounds
-  BG_RED    = "\033[41m"
-  BG_GREEN  = "\033[42m"
-  BG_YELLOW = "\033[43m"
-  BG_BLUE   = "\033[44m"
-  BG_PURPLE = "\033[45m"
-  BG_CYAN   = "\033[46m"
-  
-  RESET   = "\033[0m"
-  BOLD    = "\033[1m"
-  DIM     = "\033[2m"
-  ITALIC  = "\033[3m"
-  UNDERLINE = "\033[4m"
-  BLINK   = "\033[5m"
-end
+function Write-ErrorMsg($msg, $icon = "✗") { 
+    Write-Host "$($C.BRed)[$icon]$($C.BWhite) $msg$($C.Reset)" 
+}
 
-include Colors
+function Write-Warn($msg, $icon = "⚠") { 
+    Write-Host "$($C.BYellow)[$icon]$($C.BWhite) $msg$($C.Reset)" 
+}
 
-# ------------------ MODERN LOGO ------------------
+function Write-Ask($msg, $icon = "❯") { 
+    Write-Host "$($C.BYellow)[$icon]$($C.BWhite) $msg$($C.Reset)" -NoNewline 
+}
 
-LOGO = <<~LOGO_TEXT
-#{BPURPLE}╔═══════════════════════════════════════════════════════════════════╗
-#{BPURPLE}║  #{BRED}▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀#{BPURPLE}  ║
-#{BPURPLE}║  #{BYELLOW}▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░#{BPURPLE}  ║
-#{BPURPLE}║  #{BGREEN}▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░#{BPURPLE}  ║
-╚═══════════════════════════════════════════════════════════════════╝
-    #{BCYAN}v#{VERSION} #{EDITION} Edition#{RESET} #{DIM}• Professional Grade Tunneling#{RESET}
-    #{DIM}Multi-Protocol • Auto-Recovery • Real-Time Monitoring#{RESET}
-#{RESET}
-LOGO_TEXT
-
-# ------------------ ENHANCED UI COMPONENTS ------------------
-
-class UI
-  def self.header(title)
-    width = 70
-    padding = (width - title.length - 2) / 2
-    puts "\n#{BPURPLE}╔#{'═' * width}╗"
-    puts "#{BPURPLE}║#{' ' * padding}#{BWHITE}#{title}#{BPURPLE}#{' ' * (width - padding - title.length)}║"
-    puts "#{BPURPLE}╚#{'═' * width}╝#{RESET}\n"
-  end
-
-  def self.box(lines, color = BCYAN)
-    max_width = lines.map(&:length).max + 4
-    puts "\n#{color}╔#{'═' * max_width}╗"
-    lines.each do |line|
-      padding = max_width - line.length - 2
-      puts "#{color}║ #{BWHITE}#{line}#{' ' * padding}#{color}║"
-    end
-    puts "#{color}╚#{'═' * max_width}╝#{RESET}\n"
-  end
-
-  def self.progress_bar(current, total, width = 40)
-    percentage = (current.to_f / total * 100).round
-    filled = (width * current / total).round
-    bar = "#{BGREEN}#{'█' * filled}#{DIM}#{'░' * (width - filled)}#{RESET}"
-    print "\r#{BCYAN}[#{bar}#{BCYAN}] #{BWHITE}#{percentage}%#{RESET}"
-    puts if current >= total
-  end
-
-  def self.spinner(message)
-    spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-    i = 0
-    thread = Thread.new do
-      loop do
-        print "\r#{BCYAN}#{spinners[i]} #{BWHITE}#{message}#{RESET}"
-        i = (i + 1) % spinners.length
-        sleep 0.1
-      end
-    end
-    yield
-    thread.kill
-    print "\r#{' ' * (message.length + 5)}\r"
-  end
-
-  def self.table(headers, rows)
-    col_widths = headers.each_with_index.map do |header, i|
-      [header.length, *rows.map { |row| row[i].to_s.length }].max + 2
-    end
-
-    # Header
-    puts "\n#{BPURPLE}┌#{col_widths.map { |w| '─' * w }.join('┬')}┐"
-    puts "#{BPURPLE}│#{headers.each_with_index.map { |h, i| " #{BWHITE}#{h.ljust(col_widths[i] - 1)}#{BPURPLE}" }.join('│')}│"
-    puts "#{BPURPLE}├#{col_widths.map { |w| '─' * w }.join('┼')}┤"
-
-    # Rows
-    rows.each do |row|
-      puts "#{BPURPLE}│#{row.each_with_index.map { |cell, i| " #{WHITE}#{cell.to_s.ljust(col_widths[i] - 1)}#{BPURPLE}" }.join('│')}│"
-    end
+function Show-Header($title) {
+    $width = 70
+    $padding = [Math]::Floor(($width - $title.Length - 2) / 2)
+    $rightPadding = $width - $padding - $title.Length - 2
     
-    puts "#{BPURPLE}└#{col_widths.map { |w| '─' * w }.join('┴')}┘#{RESET}\n"
-  end
-end
+    Write-Host ""
+    Write-Host "$($C.BPurple)╔$('═' * $width)╗$($C.Reset)"
+    Write-Host "$($C.BPurple)║$(' ' * $padding)$($C.BWhite)$title$($C.BPurple)$(' ' * $rightPadding)║$($C.Reset)"
+    Write-Host "$($C.BPurple)╚$('═' * $width)╝$($C.Reset)"
+    Write-Host ""
+}
 
-# ------------------ UTILITIES ------------------
-
-def success(msg, icon = "✓")
-  puts "#{BGREEN}[#{icon}]#{BWHITE} #{msg}#{RESET}"
-end
-
-def info(msg, icon = "ℹ")
-  puts "#{BCYAN}[#{icon}]#{BWHITE} #{msg}#{RESET}"
-end
-
-def warn(msg, icon = "⚠")
-  puts "#{BYELLOW}[#{icon}]#{BWHITE} #{msg}#{RESET}"
-end
-
-def error(msg, icon = "✗")
-  puts "#{BRED}[#{icon}]#{BWHITE} #{msg}#{RESET}"
-end
-
-def ask(msg, icon = "❯")
-  print "#{BYELLOW}[#{icon}]#{BWHITE} #{msg}#{RESET}"
-end
-
-def log_event(event, details = {})
-  timestamp = Time.now.strftime("%Y-%m-%d %H:%M:%S")
-  log_entry = {
-    timestamp: timestamp,
-    event: event,
-    details: details
-  }
-  
-  log_file = "#{LOG_DIR}/events.log"
-  File.open(log_file, 'a') do |f|
-    f.puts log_entry.to_json
-  end
-end
-
-def command_exists?(cmd)
-  system("command -v #{cmd} > /dev/null 2>&1")
-end
-
-def ensure_dirs
-  [BASE_DIR, LOG_DIR, BIN_DIR, STATS_DIR].each { |d| FileUtils.mkdir_p(d) }
-end
-
-def arch
-  @arch ||= `uname -m`.strip
-end
-
-def termux?
-  @is_termux ||= Dir.exist?("/data/data/com.termux/files/home")
-end
-
-def proot_available?
-  command_exists?("proot")
-end
-
-def exec_silent(cmd)
-  system(cmd + " > /dev/null 2>&1")
-end
-
-# ------------------ NETWORK UTILITIES ------------------
-
-class NetworkUtils
-  def self.port_available?(port)
-    begin
-      Timeout::timeout(1) do
-        begin
-          s = TCPServer.new('127.0.0.1', port)
-          s.close
-          return true
-        rescue Errno::EADDRINUSE, Errno::EACCES
-          return false
-        end
-      end
-    rescue Timeout::Error
-      return false
-    end
-  end
-
-  def self.find_available_port(start_port = 8888)
-    (start_port..65535).each do |port|
-      return port if port_available?(port)
-    end
-    nil
-  end
-
-  def self.check_internet
-    begin
-      Timeout::timeout(5) do
-        Socket.tcp("1.1.1.1", 80, connect_timeout: 5) {}
-        return true
-      end
-    rescue
-      return false
-    end
-  end
-
-  def self.get_local_ip
-    Socket.ip_address_list.find { |ai| ai.ipv4? && !ai.ipv4_loopback? }&.ip_address || "127.0.0.1"
-  end
-
-  def self.ping_url(url)
-    begin
-      uri = URI.parse(url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = (uri.scheme == 'https')
-      http.open_timeout = 5
-      http.read_timeout = 5
-      
-      response = http.head(uri.path.empty? ? '/' : uri.path)
-      return response.code.to_i < 400
-    rescue
-      return false
-    end
-  end
-end
-
-# ------------------ CONFIGURATION MANAGER ------------------
-
-class ConfigManager
-  def initialize
-    @config = load_config
-  end
-
-  def load_config
-    if File.exist?(CONFIG_FILE)
-      YAML.safe_load(File.read(CONFIG_FILE), permitted_classes: [Symbol, Time]) rescue {}
-    else
-      {}
-    end
-  end
-
-  def save_config
-    FileUtils.mkdir_p(File.dirname(CONFIG_FILE))
-    File.write(CONFIG_FILE, @config.to_yaml)
-  end
-
-  def get(key, default = nil)
-    @config[key.to_s] || default
-  end
-
-  def set(key, value)
-    @config[key.to_s] = value
-    save_config
-  end
-
-  def delete(key)
-    @config.delete(key.to_s)
-    save_config
-  end
-
-  def has?(key)
-    @config.key?(key.to_s)
-  end
-
-  def all
-    @config
-  end
-end
-
-# ------------------ SESSION MANAGER ------------------
-
-class SessionManager
-  def self.save_session(data)
-    File.write(SESSION_FILE, data.to_json)
-  end
-
-  def self.load_session
-    return {} unless File.exist?(SESSION_FILE)
-    JSON.parse(File.read(SESSION_FILE)) rescue {}
-  end
-
-  def self.clear_session
-    File.delete(SESSION_FILE) if File.exist?(SESSION_FILE)
-  end
-
-  def self.active?
-    data = load_session
-    data['active'] == true && data['pid'] && process_running?(data['pid'])
-  end
-
-  def self.process_running?(pid)
-    Process.kill(0, pid)
-    true
-  rescue Errno::ESRCH, Errno::EPERM
-    false
-  end
-end
-
-# ------------------ PROCESS MANAGER ------------------
-
-class ProcessManager
-  @processes = {}
-
-  def self.register(name, pid)
-    @processes[name] = pid
-    log_event("process_started", { name: name, pid: pid })
-  end
-
-  def self.kill(name)
-    pid = @processes[name]
-    return unless pid
+function Show-Box($lines, $color = $C.BCyan) {
+    $maxWidth = ($lines | Measure-Object -Property Length -Maximum).Maximum + 4
     
-    begin
-      Process.kill("TERM", pid)
-      sleep 1
-      Process.kill("KILL", pid) if process_running?(pid)
-      log_event("process_killed", { name: name, pid: pid })
-    rescue
-      # Process already dead
-    end
-    
-    @processes.delete(name)
-  end
+    Write-Host ""
+    Write-Host "$color╔$('═' * $maxWidth)╗$($C.Reset)"
+    foreach ($line in $lines) {
+        $padding = $maxWidth - $line.Length - 2
+        Write-Host "$color║ $($C.BWhite)$line$(' ' * $padding)$color║$($C.Reset)"
+    }
+    Write-Host "$color╚$('═' * $maxWidth)╝$($C.Reset)"
+    Write-Host ""
+}
 
-  def self.kill_all
-    @processes.keys.each { |name| kill(name) }
-  end
+function Show-ProgressBar($current, $total, $width = 40) {
+    $percentage = [Math]::Round(($current / $total) * 100)
+    $filled = [Math]::Round(($width * $current) / $total)
+    $empty = $width - $filled
+    
+    $bar = "$($C.BGreen)$('█' * $filled)$($C.Dim)$('░' * $empty)$($C.Reset)"
+    Write-Host -NoNewline "`r$($C.BCyan)[$bar$($C.BCyan)] $($C.BWhite)$percentage%$($C.Reset)"
+    
+    if ($current -ge $total) { Write-Host "" }
+}
 
-  def self.cleanup
-    info "Cleaning up processes..."
-    
-    %w[ngrok loclx http-server].each do |proc|
-      exec_silent("pkill -f #{proc}")
-    end
-    
-    exec_silent("pkill -f 'cloudflared tunnel'")
-    exec_silent("pkill -f 'python3 -m http.server'")
-    exec_silent("pkill -f 'php -S'")
-    
-    kill_all
-    sleep 1
-    success "Cleanup complete"
-  end
-
-  def self.process_running?(pid)
-    Process.kill(0, pid)
-    true
-  rescue Errno::ESRCH, Errno::EPERM
-    false
-  end
-end
-
-# ------------------ STATISTICS TRACKER ------------------
-
-class StatsTracker
-  def initialize
-    @stats_file = "#{STATS_DIR}/usage_stats.json"
-    @stats = load_stats
-  end
-
-  def load_stats
-    return {} unless File.exist?(@stats_file)
-    JSON.parse(File.read(@stats_file)) rescue {}
-  end
-
-  def save_stats
-    File.write(@stats_file, JSON.pretty_generate(@stats))
-  end
-
-  def record_session(duration, tunnels_used, protocol)
-    @stats['total_sessions'] ||= 0
-    @stats['total_duration'] ||= 0
-    @stats['tunnels_count'] ||= Hash.new(0)
-    @stats['protocols_used'] ||= Hash.new(0)
-    
-    @stats['total_sessions'] += 1
-    @stats['total_duration'] += duration
-    
-    tunnels_used.each { |tunnel| @stats['tunnels_count'][tunnel.to_s] += 1 }
-    @stats['protocols_used'][protocol.to_s] += 1
-    
-    save_stats
-  end
-
-  def display_stats
-    UI.header("📊 USAGE STATISTICS")
-    
-    return info("No statistics available yet") if @stats.empty?
-    
-    puts "#{BCYAN}Total Sessions:#{BWHITE} #{@stats['total_sessions'] || 0}#{RESET}"
-    puts "#{BCYAN}Total Runtime:#{BWHITE} #{format_duration(@stats['total_duration'] || 0)}#{RESET}"
-    
-    if @stats['tunnels_count']
-      puts "\n#{BPURPLE}Tunnel Usage:#{RESET}"
-      @stats['tunnels_count'].each do |tunnel, count|
-        puts "  #{BWHITE}#{tunnel.capitalize}:#{RESET} #{count} times"
-      end
-    end
-    
-    if @stats['protocols_used']
-      puts "\n#{BPURPLE}Protocol Preference:#{RESET}"
-      @stats['protocols_used'].each do |protocol, count|
-        puts "  #{BWHITE}#{protocol.capitalize}:#{RESET} #{count} times"
-      end
-    end
-    
-    puts ""
-  end
-
-  def format_duration(seconds)
-    hours = seconds / 3600
-    minutes = (seconds % 3600) / 60
-    secs = seconds % 60
-    
-    parts = []
-    parts << "#{hours}h" if hours > 0
-    parts << "#{minutes}m" if minutes > 0
-    parts << "#{secs}s"
-    
-    parts.join(' ')
-  end
-end
-
-# ------------------ DEPENDENCY MANAGER ------------------
-
-class DependencyManager
-  def self.check_and_install
-    info "Checking system dependencies..."
-    
-    pkg_cmd = termux? ? "pkg" : "apt"
-    missing = []
-    
-    DEPENDENCIES.each do |dep|
-      pkg_name = dep == "python3" ? "python" : dep
-      
-      unless check_package(pkg_name) || command_exists?(dep)
-        missing << dep
-      end
-    end
-    
-    # Check NodeJS
-    unless check_package("nodejs") || command_exists?("node")
-      missing << "nodejs"
-    end
-    
-    if missing.empty?
-      success "All dependencies installed"
-      return true
-    end
-    
-    warn "Missing dependencies: #{missing.join(', ')}"
-    ask "\nInstall missing dependencies? (y/N): "
-    return false unless gets.chomp.downcase == 'y'
-    
-    UI.spinner("Installing dependencies") do
-      missing.each_with_index do |dep, i|
-        UI.progress_bar(i, missing.length)
-        exec_silent("#{pkg_cmd} install #{dep} -y")
-      end
-      UI.progress_bar(missing.length, missing.length)
-    end
-    
-    # Install http-server
-    if command_exists?("npm")
-      unless `npm list -g --depth=0 2>/dev/null | grep -o http-server`.include?("http-server")
-        info "Installing http-server..."
-        exec_silent("npm install -g http-server")
-      end
-    end
-    
-    # Termux: proot
-    if termux? && !proot_available?
-      info "Installing proot for Termux compatibility..."
-      exec_silent("pkg install proot -y")
-    end
-    
-    success "Dependencies installed successfully"
-    true
-  end
-
-  def self.check_package(pkg)
-    `dpkg -l 2>/dev/null | grep -o #{pkg}`.include?(pkg) ||
-    `pkg list-installed 2>/dev/null | grep -o #{pkg}`.include?(pkg)
-  end
-end
-
-# ------------------ TOOL DOWNLOADER ------------------
-
-class ToolDownloader
-  def self.download_all
-    info "Checking tunneling tools..."
-    
-    tools_status = {
-      ngrok: File.exist?(TOOLS[:ngrok]),
-      cloudflared: File.exist?(TOOLS[:cloudflared]),
-      loclx: File.exist?(TOOLS[:loclx])
+function Show-Table($headers, $rows) {
+    $colWidths = @()
+    for ($i = 0; $i -lt $headers.Count; $i++) {
+        $maxWidth = $headers[$i].Length
+        foreach ($row in $rows) {
+            if ($row[$i].ToString().Length -gt $maxWidth) {
+                $maxWidth = $row[$i].ToString().Length
+            }
+        }
+        $colWidths += $maxWidth + 2
     }
     
-    to_download = tools_status.select { |_, exists| !exists }.keys
+    # Header
+    Write-Host ""
+    Write-Host "$($C.BPurple)┌$($colWidths | ForEach-Object { '─' * $_ } | Join-String -Separator '┬')┐$($C.Reset)"
     
-    if to_download.empty?
-      success "All tools installed"
-      return true
-    end
+    $headerRow = @()
+    for ($i = 0; $i -lt $headers.Count; $i++) {
+        $headerRow += " $($C.BWhite)$($headers[$i].PadRight($colWidths[$i] - 1))$($C.BPurple)"
+    }
+    Write-Host "$($C.BPurple)│$($headerRow -join '│')│$($C.Reset)"
     
-    info "Downloading: #{to_download.map(&:to_s).join(', ')}"
+    Write-Host "$($C.BPurple)├$($colWidths | ForEach-Object { '─' * $_ } | Join-String -Separator '┼')┤$($C.Reset)"
     
-    to_download.each_with_index do |tool, i|
-      UI.progress_bar(i, to_download.length)
-      
-      case tool
-      when :ngrok then download_ngrok
-      when :cloudflared then download_cloudflared
-      when :loclx then download_loclx
-      end
-      
-      sleep 0.5
-    end
+    # Rows
+    foreach ($row in $rows) {
+        $rowText = @()
+        for ($i = 0; $i -lt $row.Count; $i++) {
+            $rowText += " $($C.White)$($row[$i].ToString().PadRight($colWidths[$i] - 1))$($C.BPurple)"
+        }
+        Write-Host "$($C.BPurple)│$($rowText -join '│')│$($C.Reset)"
+    }
     
-    UI.progress_bar(to_download.length, to_download.length)
-    success "All tools downloaded"
-    true
-  end
+    Write-Host "$($C.BPurple)└$($colWidths | ForEach-Object { '─' * $_ } | Join-String -Separator '┴')┘$($C.Reset)"
+    Write-Host ""
+}
 
-  def self.download_ngrok
-    url = case arch
-    when /arm(?!64)/ then "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm.tgz"
-    when /aarch64|arm64/ then "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm64.tgz"
-    when /x86_64/ then "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz"
-    else "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-386.tgz"
-    end
+# ---------------------------
+# Modern Logo
+# ---------------------------
+$LOGO = @"
+$($C.BPurple)╔═══════════════════════════════════════════════════════════════════╗
+$($C.BPurple)║  $($C.BRed)▒█░░░ █▀▀█ █▀▀ █▀▀█ █░░ █▀█ ▀█▀ █▀▀▄ ▀▀█▀▀ █▀▀ █▀▀█ █▀▀▄ █▀▀ ▀▀█▀▀$($C.BPurple)  ║
+$($C.BPurple)║  $($C.BYellow)▒█░░░ █░░█ █░░ █▄▄█ █░░ ░▄▀ ▒█░ █░░█ ░░█░░ █▀▀ █▄▄▀ █░░█ █▀▀ ░░█░░$($C.BPurple)  ║
+$($C.BPurple)║  $($C.BGreen)▒█▄▄█ ▀▀▀▀ ▀▀▀ ▀░░▀ ▀▀▀ █▄▄ ▄█▄ ▀░░▀ ░░▀░░ ▀▀▀ ▀░▀▀ ▀░░▀ ▀▀▀ ░░▀░░$($C.BPurple)  ║
+╚═══════════════════════════════════════════════════════════════════╝
+    $($C.BCyan)v$VERSION $EDITION Edition$($C.Reset) $($C.Dim)• Professional Grade Tunneling$($C.Reset)
+    $($C.Dim)Multi-Protocol • Auto-Recovery • Real-Time Monitoring$($C.Reset)
+$($C.Reset)
+"@
 
-    tmp = "#{BASE_DIR}/ngrok.tmp"
-    
-    return false unless exec_silent("wget -q #{url} -O #{tmp}")
-    return false unless exec_silent("tar -xzf #{tmp} -C #{BIN_DIR}")
-    
-    exec_silent("chmod +x #{TOOLS[:ngrok]}")
-    File.delete(tmp) if File.exist?(tmp)
-    true
-  end
+# ---------------------------
+# Process Management
+# ---------------------------
+$script:Processes = @{}
 
-  def self.download_cloudflared
-    url = if termux? && arch.match?(/aarch64|arm64/)
-      "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
-    else
-      case arch
-      when /arm(?!64)/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm"
-      when /aarch64|arm64/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
-      when /x86_64/ then "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
-      else "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-386"
-      end
-    end
+function Register-Process($name, $process) {
+    $script:Processes[$name] = $process
+    Log-Event "process_started" @{ name = $name; pid = $process.Id }
+}
 
-    return false unless exec_silent("wget -q #{url} -O #{TOOLS[:cloudflared]}")
-    exec_silent("chmod +x #{TOOLS[:cloudflared]}")
-    true
-  end
-
-  def self.download_loclx
-    url = "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-linux-amd64.zip"
-    tmp = "#{BASE_DIR}/loclx.zip"
-
-    return false unless exec_silent("wget -q #{url} -O #{tmp}")
-    return false unless exec_silent("unzip -q -o #{tmp} -d #{BIN_DIR}")
-    
-    exec_silent("chmod +x #{TOOLS[:loclx]}")
-    File.delete(tmp) rescue nil
-    true
-  end
-end
-
-# ------------------ TUNNEL MANAGER ------------------
-
-class TunnelManager
-  def initialize(port, config)
-    @port = port
-    @config = config
-    @tunnels = {}
-    @monitoring = false
-  end
-
-  def start_ngrok
-    info "Starting Ngrok tunnel..."
-    log_file = "#{LOG_DIR}/ngrok.log"
-    File.delete(log_file) if File.exist?(log_file)
-
-    unless @config.has?('ngrok_token')
-      warn "Ngrok authtoken not configured (may have rate limits)"
-    end
-
-    cmd = "#{TOOLS[:ngrok]} http #{@port}"
-    cmd = "cd #{BIN_DIR} && termux-chroot #{cmd}" if termux? && proot_available?
-
-    pid = spawn("#{cmd} > #{log_file} 2>&1")
-    ProcessManager.register(:ngrok, pid)
-    
-    sleep(termux? ? 8 : 5)
-
-    # Try API first (best method)
-    12.times do
-      begin
-        uri = URI.parse("http://127.0.0.1:4040/api/tunnels")
-        response = Net::HTTP.get(uri)
-        data = JSON.parse(response)
+function Stop-RegisteredProcess($name) {
+    if ($script:Processes.ContainsKey($name)) {
+        $process = $script:Processes[$name]
         
-        if data['tunnels'] && data['tunnels'][0]
-          url = data['tunnels'][0]['public_url']
-          return url.gsub('http://', 'https://') if url
-        end
-      rescue
-        # Continue retrying
-      end
-      
-      sleep 1
-    end
-
-    # Fallback: parse logs
-    6.times do
-      if File.exist?(log_file)
-        url = `grep -o "https://[^ ]*ngrok[^ ]*" #{log_file} 2>/dev/null | head -1`.strip
-        return url unless url.empty?
-      end
-      sleep 1
-    end
-
-    nil
-  end
-
-  def start_cloudflare
-    info "Starting Cloudflare tunnel..."
-    log_file = "#{LOG_DIR}/cloudflare.log"
-    File.delete(log_file) if File.exist?(log_file)
-
-    cmd = "#{TOOLS[:cloudflared]} tunnel --url http://127.0.0.1:#{@port}"
-    cmd = "cd #{BIN_DIR} && termux-chroot #{cmd}" if termux? && proot_available?
-
-    pid = spawn("#{cmd} > #{log_file} 2>&1")
-    ProcessManager.register(:cloudflared, pid)
-    
-    sleep(termux? ? 12 : 7)
-
-    20.times do
-      if File.exist?(log_file)
-        url = `grep -o "https://[^ ]*trycloudflare.com" #{log_file} 2>/dev/null | head -1`.strip
-        return url unless url.empty?
-      end
-      sleep 1
-    end
-
-    nil
-  end
-
-  def start_loclx
-    info "Starting Loclx tunnel..."
-    log_file = "#{LOG_DIR}/loclx.log"
-    File.delete(log_file) if File.exist?(log_file)
-
-    cmd = "#{TOOLS[:loclx]} tunnel http --to :#{@port}"
-    cmd += " --token=#{@config.get('loclx_token')}" if @config.has?('loclx_token')
-
-    cmd = "cd #{BIN_DIR} && termux-chroot #{cmd}" if termux? && proot_available?
-
-    pid = spawn("#{cmd} > #{log_file} 2>&1")
-    ProcessManager.register(:loclx, pid)
-    
-    sleep(termux? ? 10 : 6)
-
-    20.times do
-      if File.exist?(log_file)
-        url = `grep -o "https://[^ ]*loclx.io" #{log_file} 2>/dev/null | head -1`.strip
-        return url unless url.empty?
-      end
-      sleep 1
-    end
-
-    nil
-  end
-
-  def start_all
-    warn "Initializing all tunnels..." if termux?
-    
-    results = {}
-    
-    if File.exist?(TOOLS[:ngrok])
-      results[:ngrok] = start_ngrok
-    else
-      warn "Ngrok binary not found"
-    end
-
-    if File.exist?(TOOLS[:cloudflared])
-      results[:cloudflare] = start_cloudflare
-    else
-      warn "Cloudflared binary not found"
-    end
-
-    if File.exist?(TOOLS[:loclx])
-      results[:loclx] = start_loclx
-    else
-      warn "Loclx binary not found"
-    end
-
-    @tunnels = results
-    results
-  end
-
-  def start_monitoring
-    @monitoring = true
-    
-    Thread.new do
-      while @monitoring
-        sleep 30
-        check_tunnel_health
-      end
-    end
-  end
-
-  def stop_monitoring
-    @monitoring = false
-  end
-
-  def check_tunnel_health
-    @tunnels.each do |service, url|
-      next unless url
-      
-      if NetworkUtils.ping_url(url)
-        log_event("tunnel_health_check", { service: service, status: "healthy" })
-      else
-        warn "#{service.to_s.capitalize} tunnel appears down, attempting recovery..."
-        log_event("tunnel_health_check", { service: service, status: "unhealthy" })
+        try {
+            if (-not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                Log-Event "process_killed" @{ name = $name; pid = $process.Id }
+            }
+        } catch {
+            # Process already dead
+        }
         
-        # Attempt recovery
-        ProcessManager.kill(service)
-        sleep 2
+        $script:Processes.Remove($name)
+    }
+}
+
+function Stop-AllProcesses {
+    Write-Info "Cleaning up processes..."
+    
+    # Kill known process names
+    @("python", "php", "node", "http-server", "ngrok", "cloudflared", "loclx") | ForEach-Object {
+        Get-Process -Name $_ -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    
+    # Kill registered processes
+    $script:Processes.Keys | ForEach-Object {
+        Stop-RegisteredProcess $_
+    }
+    
+    Start-Sleep -Seconds 1
+    Write-Success "Cleanup complete"
+}
+
+# ---------------------------
+# Configuration Manager
+# ---------------------------
+function Get-Config {
+    if (Test-Path $CONFIG_FILE) {
+        try {
+            return Get-Content $CONFIG_FILE -Raw | ConvertFrom-Json
+        } catch {
+            return @{}
+        }
+    }
+    return @{}
+}
+
+function Save-Config($config) {
+    $config | ConvertTo-Json -Depth 10 | Set-Content $CONFIG_FILE
+}
+
+function Get-ConfigValue($key, $default = $null) {
+    $config = Get-Config
+    if ($config.PSObject.Properties.Name -contains $key) {
+        return $config.$key
+    }
+    return $default
+}
+
+function Set-ConfigValue($key, $value) {
+    $config = Get-Config
+    $config | Add-Member -MemberType NoteProperty -Name $key -Value $value -Force
+    Save-Config $config
+}
+
+function Remove-ConfigValue($key) {
+    $config = Get-Config
+    $config.PSObject.Properties.Remove($key)
+    Save-Config $config
+}
+
+# ---------------------------
+# Session Manager
+# ---------------------------
+function Save-Session($data) {
+    $data | ConvertTo-Json -Depth 10 | Set-Content $SESSION_FILE
+}
+
+function Get-Session {
+    if (Test-Path $SESSION_FILE) {
+        try {
+            return Get-Content $SESSION_FILE -Raw | ConvertFrom-Json
+        } catch {
+            return $null
+        }
+    }
+    return $null
+}
+
+function Clear-Session {
+    if (Test-Path $SESSION_FILE) {
+        Remove-Item $SESSION_FILE -Force
+    }
+}
+
+function Test-SessionActive {
+    $session = Get-Session
+    if (-not $session) { return $false }
+    
+    if ($session.active -and $session.pid) {
+        $process = Get-Process -Id $session.pid -ErrorAction SilentlyContinue
+        return $null -ne $process
+    }
+    
+    return $false
+}
+
+# ---------------------------
+# Logging
+# ---------------------------
+function Log-Event($event, $details = @{}) {
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = @{
+        timestamp = $timestamp
+        event = $event
+        details = $details
+    }
+    
+    $logFile = "$LOG_DIR\events.log"
+    ($logEntry | ConvertTo-Json -Compress) | Add-Content $logFile
+}
+
+# ---------------------------
+# Statistics Tracker
+# ---------------------------
+class StatsTracker {
+    [string]$StatsFile
+    [hashtable]$Stats
+    
+    StatsTracker() {
+        $this.StatsFile = "$script:STATS_DIR\usage_stats.json"
+        $this.Stats = $this.LoadStats()
+    }
+    
+    [hashtable] LoadStats() {
+        if (Test-Path $this.StatsFile) {
+            try {
+                return Get-Content $this.StatsFile -Raw | ConvertFrom-Json -AsHashtable
+            } catch {
+                return @{}
+            }
+        }
+        return @{}
+    }
+    
+    SaveStats() {
+        $this.Stats | ConvertTo-Json -Depth 10 | Set-Content $this.StatsFile
+    }
+    
+    RecordSession([int]$duration, [array]$tunnelsUsed, [string]$protocol) {
+        if (-not $this.Stats.ContainsKey('total_sessions')) { $this.Stats['total_sessions'] = 0 }
+        if (-not $this.Stats.ContainsKey('total_duration')) { $this.Stats['total_duration'] = 0 }
+        if (-not $this.Stats.ContainsKey('tunnels_count')) { $this.Stats['tunnels_count'] = @{} }
+        if (-not $this.Stats.ContainsKey('protocols_used')) { $this.Stats['protocols_used'] = @{} }
         
-        new_url = case service
-        when :ngrok then start_ngrok
-        when :cloudflare then start_cloudflare
-        when :loclx then start_loclx
-        end
+        $this.Stats['total_sessions']++
+        $this.Stats['total_duration'] += $duration
         
-        if new_url
-          @tunnels[service] = new_url
-          success "#{service.to_s.capitalize} tunnel recovered: #{new_url}"
-        else
-          error "Failed to recover #{service.to_s.capitalize} tunnel"
-        end
-      end
-    end
-  end
-end
-
-# ------------------ SERVER MANAGER ------------------
-
-class ServerManager
-  def initialize(path, port, mode)
-    @path = path
-    @port = port
-    @mode = mode
-  end
-
-  def start
-    info "Starting #{@mode.to_s.upcase} server on port #{@port}..."
-    
-    case @mode
-    when :python
-      pid = spawn("cd #{@path} && python3 -m http.server #{@port} > /dev/null 2>&1")
-    when :php
-      unless File.exist?("#{@path}/index.php") || File.exist?("#{@path}/index.html")
-        error "No index.php or index.html found in directory!"
-        return false
-      end
-      pid = spawn("cd #{@path} && php -S 127.0.0.1:#{@port} > /dev/null 2>&1")
-    when :node
-      pid = spawn("cd #{@path} && http-server -p #{@port} > /dev/null 2>&1")
-    else
-      error "Invalid server mode"
-      return false
-    end
-
-    ProcessManager.register(:server, pid)
-    sleep 3
-
-    # Verify server started
-    5.times do
-      begin
-        uri = URI.parse("http://127.0.0.1:#{@port}")
-        response = Net::HTTP.get_response(uri)
+        foreach ($tunnel in $tunnelsUsed) {
+            if (-not $this.Stats['tunnels_count'].ContainsKey($tunnel)) {
+                $this.Stats['tunnels_count'][$tunnel] = 0
+            }
+            $this.Stats['tunnels_count'][$tunnel]++
+        }
         
-        if response.code.to_i < 400
-          success "Server running at http://127.0.0.1:#{@port}"
-          log_event("server_started", { mode: @mode, port: @port, path: @path })
-          return true
-        end
-      rescue
-        # Continue retrying
-      end
-      sleep 1
-    end
-    
-    error "Local server failed to start!"
-    error "Check if port #{@port} is already in use"
-    false
-  end
-end
-
-# ------------------ API KEY MANAGER ------------------
-
-class APIKeyManager
-  def initialize(config)
-    @config = config
-  end
-
-  def manage
-    loop do
-      system("clear")
-      puts LOGO
-      UI.header("🔑 API KEY MANAGEMENT")
-      
-      puts "#{BWHITE}1)#{RESET} Set Ngrok Authtoken"
-      puts "#{BWHITE}2)#{RESET} Set Loclx Access Token"
-      puts "#{BWHITE}3)#{RESET} View Current Keys"
-      puts "#{BWHITE}4)#{RESET} Test API Keys"
-      puts "#{BWHITE}5)#{RESET} Remove Keys"
-      puts "#{BWHITE}0)#{RESET} Back to Main Menu"
-      
-      ask "\nChoice: "
-      choice = gets.chomp.strip
-
-      case choice
-      when "1" then set_ngrok_token
-      when "2" then set_loclx_token
-      when "3" then view_keys
-      when "4" then test_keys
-      when "5" then remove_keys
-      when "0" then break
-      else
-        warn "Invalid choice!"
-        sleep 1
-      end
-    end
-  end
-
-  def set_ngrok_token
-    puts ""
-    ask "Enter Ngrok authtoken (from https://dashboard.ngrok.com): "
-    token = gets.chomp.strip
-    
-    if token.empty?
-      warn "Token cannot be empty!"
-      sleep 2
-      return
-    end
-    
-    # Test configuration
-    if exec_silent("#{TOOLS[:ngrok]} config add-authtoken #{token}")
-      @config.set('ngrok_token', token)
-      success "Ngrok authtoken saved and configured!"
-      log_event("api_key_configured", { service: "ngrok" })
-    else
-      error "Failed to configure ngrok authtoken"
-    end
-    sleep 2
-  end
-
-  def set_loclx_token
-    puts ""
-    ask "Enter Loclx access token (from https://localxpose.io): "
-    token = gets.chomp.strip
-    
-    if token.empty?
-      warn "Token cannot be empty!"
-      sleep 2
-      return
-    end
-    
-    @config.set('loclx_token', token)
-    success "Loclx access token saved!"
-    log_event("api_key_configured", { service: "loclx" })
-    sleep 2
-  end
-
-  def view_keys
-    puts ""
-    UI.header("Current API Keys")
-    
-    ngrok_token = @config.get('ngrok_token')
-    loclx_token = @config.get('loclx_token')
-    
-    rows = [
-      ["Ngrok", ngrok_token ? "#{ngrok_token[0..15]}***" : "Not configured", ngrok_token ? "✓" : "✗"],
-      ["Loclx", loclx_token ? "#{loclx_token[0..15]}***" : "Not configured", loclx_token ? "✓" : "✗"]
-    ]
-    
-    UI.table(["Service", "Token", "Status"], rows)
-    
-    puts "#{DIM}Benefits: Remove rate limits • Persistent URLs • Priority support#{RESET}"
-    
-    ask "\nPress ENTER to continue..."
-    gets
-  end
-
-  def test_keys
-    puts ""
-    info "Testing API key configurations..."
-    
-    # Test Ngrok
-    if @config.has?('ngrok_token')
-      print "#{BCYAN}Testing Ngrok...#{RESET} "
-      
-      # Check if token is in ngrok config
-      config_check = `#{TOOLS[:ngrok]} config check 2>&1`
-      
-      if config_check.include?("Valid") || config_check.include?("OK")
-        puts "#{BGREEN}✓ Valid#{RESET}"
-      else
-        puts "#{BRED}✗ Invalid#{RESET}"
-      end
-    else
-      puts "#{BYELLOW}Ngrok: Not configured#{RESET}"
-    end
-    
-    # Test Loclx
-    if @config.has?('loclx_token')
-      puts "#{BGREEN}✓#{RESET} Loclx: Token configured (cannot validate without starting tunnel)"
-    else
-      puts "#{BYELLOW}Loclx: Not configured#{RESET}"
-    end
-    
-    ask "\nPress ENTER to continue..."
-    gets
-  end
-
-  def remove_keys
-    puts ""
-    warn "Remove which key?"
-    puts "#{BWHITE}1)#{RESET} Ngrok"
-    puts "#{BWHITE}2)#{RESET} Loclx"
-    puts "#{BWHITE}3)#{RESET} Both"
-    puts "#{BWHITE}0)#{RESET} Cancel"
-    
-    ask "\nChoice: "
-    choice = gets.chomp.strip
-    
-    case choice
-    when "1"
-      @config.delete('ngrok_token')
-      success "Ngrok token removed!"
-    when "2"
-      @config.delete('loclx_token')
-      success "Loclx token removed!"
-    when "3"
-      @config.delete('ngrok_token')
-      @config.delete('loclx_token')
-      success "All tokens removed!"
-    end
-    
-    sleep 2
-  end
-end
-
-# ------------------ CLI INTERFACE ------------------
-
-class CLI
-  def initialize(config)
-    @config = config
-    @stats = StatsTracker.new
-  end
-
-  def select_server
-    puts ""
-    UI.header("Select Hosting Protocol")
-    puts "#{BWHITE}1)#{RESET} Python (http.server) #{DIM}- Recommended, universal#{RESET}"
-    puts "#{BWHITE}2)#{RESET} PHP (built-in server) #{DIM}- For PHP applications#{RESET}"
-    puts "#{BWHITE}3)#{RESET} NodeJS (http-server) #{DIM}- Modern, feature-rich#{RESET}"
-    
-    ask "Choice [1-3] (default: 1): "
-    choice = gets.chomp.strip
-    choice = "1" if choice.empty?
-
-    case choice
-    when "1" then :python
-    when "2" then :php
-    when "3" then :node
-    else
-      warn "Invalid choice, using Python"
-      :python
-    end
-  end
-
-  def get_directory
-    loop do
-      puts ""
-      ask "Enter directory path to host (or '.' for current): "
-      input = gets.chomp.strip
-      
-      if input.empty?
-        warn "Please enter a valid directory path!"
-        next
-      end
-      
-      path = File.expand_path(input)
-      
-      if Dir.exist?(path)
-        success "Selected directory: #{path}"
+        if (-not $this.Stats['protocols_used'].ContainsKey($protocol)) {
+            $this.Stats['protocols_used'][$protocol] = 0
+        }
+        $this.Stats['protocols_used'][$protocol]++
         
-        # Show directory contents preview
-        files = Dir.entries(path).reject { |f| f.start_with?('.') }.take(5)
-        if files.any?
-          puts "\n#{DIM}Preview (first 5 items):#{RESET}"
-          files.each { |f| puts "  #{DIM}•#{RESET} #{f}" }
-          puts "  #{DIM}... (#{Dir.entries(path).length - 5} more)#{RESET}" if Dir.entries(path).length > 5
-        end
+        $this.SaveStats()
+    }
+    
+    DisplayStats() {
+        Show-Header "📊 USAGE STATISTICS"
         
-        return path
-      else
-        error "Directory '#{path}' does not exist!"
-        warn "Please enter a valid path (e.g., /home/user/mysite or ./mysite)"
-      end
-    end
-  end
-
-  def get_port
-    last_port = @config.get('last_port', DEFAULT_PORT)
-    
-    puts ""
-    ask "Enter port (default: #{last_port}): "
-    port = gets.chomp.strip
-    
-    port = last_port if port.empty?
-    port_num = port.to_i
-    
-    if port_num <= 0 || port_num > 65535
-      warn "Invalid port, using default #{DEFAULT_PORT}"
-      return DEFAULT_PORT
-    end
-    
-    unless NetworkUtils.port_available?(port_num)
-      error "Port #{port_num} is already in use!"
-      
-      # Find alternative
-      alt_port = NetworkUtils.find_available_port(port_num + 1)
-      
-      if alt_port
-        info "Suggested alternative port: #{alt_port}"
-        ask "Use port #{alt_port}? (Y/n): "
-        choice = gets.chomp.strip.downcase
+        if ($this.Stats.Count -eq 0) {
+            Write-Info "No statistics available yet"
+            return
+        }
         
-        return alt_port unless choice == 'n'
-      end
-      
-      return get_port
-    end
+        Write-Host "$($C.BCyan)Total Sessions:$($C.BWhite) $($this.Stats['total_sessions'])$($C.Reset)"
+        Write-Host "$($C.BCyan)Total Runtime:$($C.BWhite) $($this.FormatDuration($this.Stats['total_duration']))$($C.Reset)"
+        
+        if ($this.Stats.ContainsKey('tunnels_count') -and $this.Stats['tunnels_count'].Count -gt 0) {
+            Write-Host ""
+            Write-Host "$($C.BPurple)Tunnel Usage:$($C.Reset)"
+            foreach ($tunnel in $this.Stats['tunnels_count'].Keys) {
+                Write-Host "  $($C.BWhite)${tunnel}:$($C.Reset) $($this.Stats['tunnels_count'][$tunnel]) times"
+            }
+        }
+        
+        if ($this.Stats.ContainsKey('protocols_used') -and $this.Stats['protocols_used'].Count -gt 0) {
+            Write-Host ""
+            Write-Host "$($C.BPurple)Protocol Preference:$($C.Reset)"
+            foreach ($protocol in $this.Stats['protocols_used'].Keys) {
+                Write-Host "  $($C.BWhite)${protocol}:$($C.Reset) $($this.Stats['protocols_used'][$protocol]) times"
+            }
+        }
+        
+        Write-Host ""
+    }
     
-    @config.set('last_port', port_num)
-    port_num
-  end
+    [string] FormatDuration([int]$seconds) {
+        $hours = [Math]::Floor($seconds / 3600)
+        $minutes = [Math]::Floor(($seconds % 3600) / 60)
+        $secs = $seconds % 60
+        
+        $parts = @()
+        if ($hours -gt 0) { $parts += "${hours}h" }
+        if ($minutes -gt 0) { $parts += "${minutes}m" }
+        $parts += "${secs}s"
+        
+        return $parts -join ' '
+    }
+}
 
-  def display_results(urls)
-    puts ""
-    UI.header("🌍 PUBLIC URLS READY")
-    
-    active_tunnels = urls.select { |_, url| url }
-    
-    if active_tunnels.empty?
-      error "All tunnels failed to start!"
-      
-      UI.box([
-        "Troubleshooting:",
-        "• Check your internet connection",
-        "• Verify firewall settings",
-        "• Configure API keys (Menu option 2)",
-        "• Check logs in: #{LOG_DIR}",
-        "",
-        "Server is still accessible locally"
-      ], BYELLOW)
-      
-      return false
-    end
-    
-    # Display as table
-    rows = urls.map do |service, url|
-      status = url ? "#{BGREEN}Active#{RESET}" : "#{BRED}Failed#{RESET}"
-      [service.to_s.capitalize, url || "N/A", status]
-    end
-    
-    UI.table(["Service", "Public URL", "Status"], rows)
-    
-    # Summary
-    puts "#{BGREEN}#{active_tunnels.length}/#{urls.length} tunnels active#{RESET}"
-    
-    if active_tunnels.length < urls.length
-      puts "#{DIM}TIP: Configure API keys for better reliability (Menu option 2)#{RESET}"
-    end
-    
-    # Copy suggestion
-    if active_tunnels.length == 1
-      url = active_tunnels.values.first
-      puts "\n#{BCYAN}Quick copy:#{RESET} #{url}"
-    end
-    
-    true
-  end
+# ---------------------------
+# Network Utilities
+# ---------------------------
+function Test-PortAvailable($port) {
+    try {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $port)
+        $listener.Start()
+        $listener.Stop()
+        return $true
+    } catch {
+        return $false
+    }
+}
 
-  def show_about
-    system("clear")
-    puts LOGO
-    
-    UI.box([
-      "Tool Name    : Local2Internet v#{VERSION}",
-      "Edition      : #{EDITION}",
-      "Description  : Professional LocalHost Exposing Tool",
-      "Author       : KasRoudra",
-      "Enhanced By  : Muhammad Taezeem Tariq Matta",
-      "Ultimate By  : Claude AI Assistant",
-      "Github       : github.com/Taezeem14/Local2Internet",
-      "License      : MIT Open Source"
-    ], BPURPLE)
-    
-    puts "\n#{BCYAN}✨ Features:#{RESET}"
-    features = [
-      "Triple Tunneling (Ngrok, Cloudflare, Loclx)",
-      "API Key Support & Management",
-      "Auto-Recovery & Health Monitoring",
-      "Real-Time Statistics Tracking",
-      "Multi-Protocol Server Support",
-      "Enhanced Termux Compatibility",
-      "Intelligent Port Detection",
-      "Session Management",
-      "Advanced Error Handling",
-      "Modern Terminal UI"
-    ]
-    
-    features.each { |f| puts "  #{BGREEN}•#{RESET} #{f}" }
-    
-    ask "\n#{DIM}Press ENTER to continue...#{RESET}"
-    gets
-  end
+function Find-AvailablePort($startPort = 8888) {
+    for ($port = $startPort; $port -le 65535; $port++) {
+        if (Test-PortAvailable $port) {
+            return $port
+        }
+    }
+    return $null
+}
 
-  def show_help
-    system("clear")
-    puts LOGO
-    UI.header("📚 HELP & DOCUMENTATION")
-    
-    puts "\n#{BCYAN}GETTING STARTED:#{RESET}"
-    puts "  1. Select 'Start Server & Tunnels' from main menu"
-    puts "  2. Enter the directory path you want to host"
-    puts "  3. Choose your preferred server protocol"
-    puts "  4. Enter a port number (or use default)"
-    puts "  5. Wait for tunnels to initialize"
-    puts "  6. Share the public URLs with others!"
-    
-    puts "\n#{BCYAN}API KEY CONFIGURATION:#{RESET}"
-    puts "  • Ngrok: Get authtoken from https://dashboard.ngrok.com"
-    puts "  • Loclx: Get access token from https://localxpose.io/dashboard"
-    puts "  #{DIM}Benefits: Remove rate limits, persistent URLs, priority support#{RESET}"
-    
-    puts "\n#{BCYAN}TROUBLESHOOTING:#{RESET}"
-    puts "  • Port in use: Tool will suggest alternatives automatically"
-    puts "  • Tunnels fail: Check internet, firewall, add API keys"
-    puts "  • Server fails: Ensure directory has index.html or index.php"
-    puts "  • Termux issues: Make sure proot is installed (pkg install proot)"
-    
-    puts "\n#{BCYAN}LOGS & STATISTICS:#{RESET}"
-    puts "  • Event logs: #{LOG_DIR}/events.log"
-    puts "  • Tunnel logs: #{LOG_DIR}/<service>.log"
-    puts "  • Statistics: Menu option 5"
-    
-    puts "\n#{BCYAN}ADVANCED FEATURES:#{RESET}"
-    puts "  • Auto-recovery: Tunnels auto-restart on failure"
-    puts "  • Health monitoring: Real-time tunnel status checking"
-    puts "  • Session persistence: Remembers your preferences"
-    
-    ask "\n#{DIM}Press ENTER to continue...#{RESET}"
-    gets
-  end
-end
+function Test-InternetConnection {
+    try {
+        $response = Test-Connection -ComputerName "1.1.1.1" -Count 1 -TimeoutSeconds 5 -Quiet
+        return $response
+    } catch {
+        return $false
+    }
+}
 
-# ------------------ MAIN MENU ------------------
+function Get-LocalIPAddress {
+    try {
+        $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike "*Loopback*" } | Select-Object -First 1).IPAddress
+        return $ip
+    } catch {
+        return "127.0.0.1"
+    }
+}
 
-def main_menu(config, stats)
-  loop do
-    system("clear")
-    puts LOGO
-    UI.header("MAIN MENU")
-    
-    puts "#{BWHITE}1)#{RESET} Start Server & Tunnels #{BGREEN}[Recommended]#{RESET}"
-    puts "#{BWHITE}2)#{RESET} Manage API Keys #{DIM}[Configure tokens]#{RESET}"
-    puts "#{BWHITE}3)#{RESET} View Statistics #{DIM}[Usage data]#{RESET}"
-    puts "#{BWHITE}4)#{RESET} System Status #{DIM}[Check dependencies]#{RESET}"
-    puts "#{BWHITE}5)#{RESET} Help & Documentation"
-    puts "#{BWHITE}6)#{RESET} About"
-    puts "#{BWHITE}0)#{RESET} Exit"
-    
-    # Show status
-    puts "\n#{BCYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{RESET}"
-    
-    ngrok_status = config.has?('ngrok_token') ? "#{BGREEN}✓ Configured#{RESET}" : "#{BRED}✗ Not Set#{RESET}"
-    loclx_status = config.has?('loclx_token') ? "#{BGREEN}✓ Configured#{RESET}" : "#{BRED}✗ Not Set#{RESET}"
-    
-    puts "#{DIM}API Keys:#{RESET} Ngrok: #{ngrok_status} | Loclx: #{loclx_status}"
-    
-    if SessionManager.active?
-      puts "#{BYELLOW}⚠ Active session detected#{RESET}"
-    end
-    
-    local_ip = NetworkUtils.get_local_ip
-    internet = NetworkUtils.check_internet ? "#{BGREEN}Connected#{RESET}" : "#{BRED}No Connection#{RESET}"
-    puts "#{DIM}Network:#{RESET} Local IP: #{local_ip} | Internet: #{internet}"
-    
-    ask "\nChoice: "
-    choice = gets.chomp.strip
+function Test-URLReachable($url) {
+    try {
+        $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 5 -UseBasicParsing -ErrorAction SilentlyContinue
+        return $response.StatusCode -lt 400
+    } catch {
+        return $false
+    }
+}
 
-    case choice
-    when "1" then run_server(config, stats)
-    when "2" then APIKeyManager.new(config).manage
-    when "3" then stats.display_stats; ask("\n#{DIM}Press ENTER...#{RESET}"); gets
-    when "4" then system_status; ask("\n#{DIM}Press ENTER...#{RESET}"); gets
-    when "5" then CLI.new(config).show_help
-    when "6" then CLI.new(config).show_about
-    when "0"
-      ProcessManager.cleanup
-      puts "\n#{BGREEN}Thanks for using Local2Internet! 👋#{RESET}\n"
-      exit 0
-    else
-      warn "Invalid choice! Please select 0-6"
-      sleep 1
-    end
-  end
-end
+# ---------------------------
+# Setup Directories
+# ---------------------------
+function Initialize-Directories {
+    @($BASE_DIR, $BIN_DIR, $LOG_DIR, $STATS_DIR) | ForEach-Object {
+        if (-not (Test-Path $_)) {
+            New-Item -ItemType Directory -Path $_ -Force | Out-Null
+        }
+    }
+}
 
-def system_status
-  system("clear")
-  puts LOGO
-  UI.header("💻 SYSTEM STATUS")
-  
-  # Dependencies
-  puts "\n#{BCYAN}Dependencies:#{RESET}"
-  deps_status = DEPENDENCIES.map do |dep|
-    status = command_exists?(dep) ? "#{BGREEN}✓#{RESET}" : "#{BRED}✗#{RESET}"
-    [dep, status]
-  end
-  
-  UI.table(["Package", "Status"], deps_status)
-  
-  # Tunneling tools
-  puts "#{BCYAN}Tunneling Tools:#{RESET}"
-  tools_status = TOOLS.map do |name, path|
-    status = File.exist?(path) ? "#{BGREEN}✓ Installed#{RESET}" : "#{BRED}✗ Missing#{RESET}"
-    [name.to_s.capitalize, status]
-  end
-  
-  UI.table(["Tool", "Status"], tools_status)
-  
-  # System info
-  puts "#{BCYAN}System Information:#{RESET}"
-  puts "  Platform: #{termux? ? 'Termux (Android)' : 'Linux'}"
-  puts "  Architecture: #{arch}"
-  puts "  Ruby Version: #{RUBY_VERSION}"
-  puts "  Internet: #{NetworkUtils.check_internet ? 'Connected' : 'Disconnected'}"
-  puts "  Local IP: #{NetworkUtils.get_local_ip}"
-end
+# ---------------------------
+# Dependency Management
+# ---------------------------
+function Test-CommandExists($cmd) {
+    return $null -ne (Get-Command $cmd -ErrorAction SilentlyContinue)
+}
 
-def run_server(config, stats)
-  system("clear")
-  puts LOGO
-  
-  # Pre-flight checks
-  unless NetworkUtils.check_internet
-    error "No internet connection detected!"
-    warn "Tunneling requires an active internet connection"
-    ask "\nContinue anyway? (y/N): "
-    return unless gets.chomp.downcase == 'y'
-  end
-  
-  cli = CLI.new(config)
-  
-  # Get user inputs
-  path = cli.get_directory
-  server_mode = cli.select_server
-  port = cli.get_port
-  
-  # Termux reminder
-  if termux?
-    warn "Termux detected!"
-    info "For best results, enable mobile hotspot or connect to WiFi"
-    sleep 2
-  end
-  
-  # Start local server
-  server = ServerManager.new(path, port, server_mode)
-  return unless server.start
-  
-  # Start tunnels
-  tunnel_manager = TunnelManager.new(port, config)
-  urls = tunnel_manager.start_all
-  
-  # Display results
-  has_urls = cli.display_results(urls)
-  
-  return unless has_urls
-  
-  # Save session
-  session_data = {
-    active: true,
-    pid: Process.pid,
-    port: port,
-    mode: server_mode,
-    started_at: Time.now,
-    urls: urls
-  }
-  SessionManager.save_session(session_data)
-  
-  # Start monitoring
-  tunnel_manager.start_monitoring
-  
-  # Keep alive with status updates
-  start_time = Time.now
-  
-  puts "\n#{BCYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{RESET}"
-  puts "#{BGREEN}Server is running with health monitoring enabled#{RESET}"
-  puts "#{DIM}Press CTRL+C to stop and return to menu#{RESET}"
-  puts "#{BCYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{RESET}\n"
-  
-  begin
-    loop do
-      sleep 60
-      
-      # Show periodic status
-      uptime = Time.now - start_time
-      hours = (uptime / 3600).to_i
-      minutes = ((uptime % 3600) / 60).to_i
-      
-      print "\r#{DIM}Uptime: #{hours}h #{minutes}m | Monitoring active#{RESET}"
-    end
-  rescue Interrupt
-    # Handled by signal trap
-  ensure
-    tunnel_manager.stop_monitoring
+function Install-Dependencies {
+    Write-Info "Checking dependencies..."
     
-    # Record session statistics
-    duration = (Time.now - start_time).to_i
-    active_tunnels = urls.select { |_, url| url }.keys
-    stats.record_session(duration, active_tunnels, server_mode)
+    $deps = @{
+        "python" = "python"
+        "php" = "php"
+        "node" = "nodejs"
+    }
     
-    SessionManager.clear_session
-  end
-end
-
-# ------------------ SIGNAL HANDLERS ------------------
-
-def setup_signal_handlers
-  Signal.trap("INT") do
-    puts "\n\n#{BCYAN}Shutting down gracefully...#{RESET}"
-    ProcessManager.cleanup
-    SessionManager.clear_session
-    puts "#{BGREEN}Thanks for using Local2Internet! 👋#{RESET}\n"
-    exit 0
-  end
-
-  Signal.trap("TERM") do
-    ProcessManager.cleanup
-    SessionManager.clear_session
-    exit 0
-  end
-end
-
-# ------------------ ENTRY POINT ------------------
-
-begin
-  setup_signal_handlers
-  ProcessManager.cleanup
-  ensure_dirs
-  
-  # Initialize managers
-  config = ConfigManager.new
-  stats = StatsTracker.new
-  
-  # First run setup
-  unless config.has?('first_run_done')
-    system("clear")
-    puts LOGO
+    $missing = @()
     
-    UI.box([
-      "Welcome to Local2Internet v#{VERSION} #{EDITION}!",
-      "",
-      "First-time setup wizard",
-      "Installing dependencies and tools..."
-    ], BGREEN)
+    foreach ($dep in $deps.Keys) {
+        if (-not (Test-CommandExists $dep)) {
+            $missing += $deps[$dep]
+        }
+    }
     
-    sleep 2
+    if ($missing.Count -eq 0) {
+        Write-Success "All dependencies installed"
+        return $true
+    }
     
-    DependencyManager.check_and_install
-    ToolDownloader.download_all
+    $chocoInstalled = Test-CommandExists "choco"
+    
+    if (-not $chocoInstalled) {
+        Write-ErrorMsg "Chocolatey is required to install missing dependencies"
+        Write-Info "Please install Chocolatey: https://chocolatey.org/install"
+        return $false
+    }
+    
+    Write-Warn "Missing dependencies: $($missing -join ', ')"
+    Write-Ask "`nInstall missing dependencies? (y/N): "
+    $response = Read-Host
+    
+    if ($response -ne 'y' -and $response -ne 'Y') {
+        return $false
+    }
+    
+    foreach ($pkg in $missing) {
+        Show-ProgressBar ($missing.IndexOf($pkg) + 1) $missing.Count
+        choco install $pkg -y --force | Out-Null
+    }
+    
+    Show-ProgressBar $missing.Count $missing.Count
+    
+    # Refresh PATH
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    
+    # Install http-server via npm
+    if (Test-CommandExists "npm") {
+        $httpServer = npm list -g http-server 2>$null | Select-String "http-server"
+        
+        if (-not $httpServer) {
+            Write-Info "Installing http-server..."
+            npm install -g http-server 2>&1 | Out-Null
+        }
+    }
+    
+    Write-Success "Dependencies installed successfully"
+    return $true
+}
+
+# ---------------------------
+# Architecture Detection
+# ---------------------------
+function Get-SystemArchitecture {
+    $arch = (Get-WmiObject Win32_Processor).AddressWidth
+    
+    switch ($arch) {
+        64 { return "amd64" }
+        32 { return "386" }
+        default { return "amd64" }
+    }
+}
+
+# ---------------------------
+# Tool Downloads
+# ---------------------------
+function Install-Ngrok {
+    $ngrokPath = "$BIN_DIR\ngrok.exe"
+    
+    if (Test-Path $ngrokPath) {
+        return $true
+    }
+    
+    Write-Info "Downloading Ngrok..."
+    $arch = Get-SystemArchitecture
+    $url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-$arch.zip"
+    $zipPath = "$BASE_DIR\ngrok.zip"
+    
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+        Expand-Archive -Path $zipPath -DestinationPath $BIN_DIR -Force
+        Remove-Item $zipPath -Force
+        Write-Success "Ngrok installed!"
+        return $true
+    } catch {
+        Write-ErrorMsg "Failed to download Ngrok: $_"
+        return $false
+    }
+}
+
+function Install-Cloudflared {
+    $cfPath = "$BIN_DIR\cloudflared.exe"
+    
+    if (Test-Path $cfPath) {
+        return $true
+    }
+    
+    Write-Info "Downloading Cloudflared..."
+    $arch = Get-SystemArchitecture
+    $url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-$arch.exe"
+    
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $cfPath -UseBasicParsing
+        Write-Success "Cloudflared installed!"
+        return $true
+    } catch {
+        Write-Warn "Failed to download Cloudflared (non-critical)"
+        return $false
+    }
+}
+
+function Install-Loclx {
+    $loclxPath = "$BIN_DIR\loclx.exe"
+    
+    if (Test-Path $loclxPath) {
+        return $true
+    }
+    
+    Write-Info "Downloading Loclx..."
+    $arch = Get-SystemArchitecture
+    $url = "https://lxpdownloads.sgp1.digitaloceanspaces.com/cli/loclx-windows-$arch.zip"
+    $zipPath = "$BASE_DIR\loclx.zip"
+    
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+        Expand-Archive -Path $zipPath -DestinationPath $BIN_DIR -Force
+        Remove-Item $zipPath -Force
+        Write-Success "Loclx installed!"
+        return $true
+    } catch {
+        Write-Warn "Loclx download failed (non-critical)"
+        return $false
+    }
+}
+
+function Install-Tools {
+    Write-Info "Checking tunneling tools..."
+    
+    $success = $true
+    
+    Show-ProgressBar 0 3
+    $success = (Install-Ngrok) -and $success
+    Show-ProgressBar 1 3
+    $success = (Install-Cloudflared) -and $success
+    Show-ProgressBar 2 3
+    $success = (Install-Loclx) -and $success
+    Show-ProgressBar 3 3
+    
+    if ($success) {
+        Write-Success "All tools installed"
+    }
+    
+    return $success
+}
+
+# ---------------------------
+# API Key Management
+# ---------------------------
+function Manage-APIKeys {
+    while ($true) {
+        Clear-Host
+        Write-Host $LOGO
+        Show-Header "🔑 API KEY MANAGEMENT"
+        
+        Write-Host "$($C.BWhite)1)$($C.Reset) Set Ngrok Authtoken"
+        Write-Host "$($C.BWhite)2)$($C.Reset) Set Loclx Access Token"
+        Write-Host "$($C.BWhite)3)$($C.Reset) View Current Keys"
+        Write-Host "$($C.BWhite)4)$($C.Reset) Test API Keys"
+        Write-Host "$($C.BWhite)5)$($C.Reset) Remove Keys"
+        Write-Host "$($C.BWhite)0)$($C.Reset) Back to Main Menu"
+        
+        Write-Ask "`nChoice: "
+        $choice = Read-Host
+        
+        switch ($choice) {
+            "1" {
+                Write-Host ""
+                Write-Ask "Enter Ngrok authtoken (from https://dashboard.ngrok.com): "
+                $token = Read-Host
+                
+                if ($token) {
+                    $ngrokPath = "$BIN_DIR\ngrok.exe"
+                    $result = & $ngrokPath config add-authtoken $token 2>&1
+                    
+                    if ($LASTEXITCODE -eq 0) {
+                        Set-ConfigValue "ngrok_token" $token
+                        Write-Success "Ngrok authtoken saved and configured!"
+                        Log-Event "api_key_configured" @{ service = "ngrok" }
+                    } else {
+                        Write-ErrorMsg "Failed to configure ngrok authtoken"
+                    }
+                } else {
+                    Write-Warn "Token cannot be empty!"
+                }
+                Start-Sleep -Seconds 2
+            }
+            "2" {
+                Write-Host ""
+                Write-Ask "Enter Loclx access token (from https://localxpose.io): "
+                $token = Read-Host
+                
+                if ($token) {
+                    Set-ConfigValue "loclx_token" $token
+                    Write-Success "Loclx access token saved!"
+                    Log-Event "api_key_configured" @{ service = "loclx" }
+                } else {
+                    Write-Warn "Token cannot be empty!"
+                }
+                Start-Sleep -Seconds 2
+            }
+            "3" {
+                Write-Host ""
+                Show-Header "Current API Keys"
+                
+                $ngrokToken = Get-ConfigValue "ngrok_token"
+                $loclxToken = Get-ConfigValue "loclx_token"
+                
+                $rows = @(
+                    @("Ngrok", ($ngrokToken ? $ngrokToken.Substring(0, [Math]::Min(15, $ngrokToken.Length)) + "***" : "Not configured"), ($ngrokToken ? "✓" : "✗")),
+                    @("Loclx", ($loclxToken ? $loclxToken.Substring(0, [Math]::Min(15, $loclxToken.Length)) + "***" : "Not configured"), ($loclxToken ? "✓" : "✗"))
+                )
+                
+                Show-Table @("Service", "Token", "Status") $rows
+                
+                Write-Host "$($C.Dim)Benefits: Remove rate limits • Persistent URLs • Priority support$($C.Reset)"
+                
+                Write-Ask "`nPress ENTER to continue..."
+                Read-Host | Out-Null
+            }
+            "4" {
+                Write-Host ""
+                Write-Info "Testing API key configurations..."
+                
+                # Test Ngrok
+                if (Get-ConfigValue "ngrok_token") {
+                    Write-Host -NoNewline "$($C.BCyan)Testing Ngrok...$($C.Reset) "
+                    
+                    $ngrokPath = "$BIN_DIR\ngrok.exe"
+                    $configCheck = & $ngrokPath config check 2>&1
+                    
+                    if ($configCheck -match "Valid|OK" -or $LASTEXITCODE -eq 0) {
+                        Write-Host "$($C.BGreen)✓ Valid$($C.Reset)"
+                    } else {
+                        Write-Host "$($C.BRed)✗ Invalid$($C.Reset)"
+                    }
+                } else {
+                    Write-Host "$($C.BYellow)Ngrok: Not configured$($C.Reset)"
+                }
+                
+                # Test Loclx
+                if (Get-ConfigValue "loclx_token") {
+                    Write-Host "$($C.BGreen)✓$($C.Reset) Loclx: Token configured (cannot validate without starting tunnel)"
+                } else {
+                    Write-Host "$($C.BYellow)Loclx: Not configured$($C.Reset)"
+                }
+                
+                Write-Ask "`nPress ENTER to continue..."
+                Read-Host | Out-Null
+            }
+            "5" {
+                Write-Host ""
+                Write-Warn "Remove which key?"
+                Write-Host "$($C.BWhite)1)$($C.Reset) Ngrok"
+                Write-Host "$($C.BWhite)2)$($C.Reset) Loclx"
+                Write-Host "$($C.BWhite)3)$($C.Reset) Both"
+                Write-Host "$($C.BWhite)0)$($C.Reset) Cancel"
+                
+                Write-Ask "`nChoice: "
+                $removeChoice = Read-Host
+                
+                switch ($removeChoice) {
+                    "1" {
+                        Remove-ConfigValue "ngrok_token"
+                        Write-Success "Ngrok token removed!"
+                    }
+                    "2" {
+                        Remove-ConfigValue "loclx_token"
+                        Write-Success "Loclx token removed!"
+                    }
+                    "3" {
+                        Remove-ConfigValue "ngrok_token"
+                        Remove-ConfigValue "loclx_token"
+                        Write-Success "All tokens removed!"
+                    }
+                }
+                Start-Sleep -Seconds 2
+            }
+            "0" {
+                return
+            }
+            default {
+                Write-Warn "Invalid choice!"
+                Start-Sleep -Seconds 1
+            }
+        }
+    }
+}
+
+# ---------------------------
+# Server Manager
+# ---------------------------
+function Start-LocalServer($path, $port, $mode) {
+    Write-Info "Starting $mode server on port $port..."
+    
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.WorkingDirectory = $path
+    $psi.CreateNoWindow = $true
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    
+    switch ($mode) {
+        "Python" {
+            $psi.FileName = "python"
+            $psi.Arguments = "-m http.server $port"
+        }
+        "PHP" {
+            if (-not ((Test-Path "$path\index.php") -or (Test-Path "$path\index.html"))) {
+                Write-ErrorMsg "No index.php or index.html found in directory!"
+                return $false
+            }
+            $psi.FileName = "php"
+            $psi.Arguments = "-S 127.0.0.1:$port"
+        }
+        "NodeJS" {
+            $psi.FileName = "http-server"
+            $psi.Arguments = "-p $port"
+        }
+        default {
+            Write-ErrorMsg "Invalid server mode!"
+            return $false
+        }
+    }
+    
+    try {
+        $process = [System.Diagnostics.Process]::Start($psi)
+        Register-Process "server" $process
+        
+        Start-Sleep -Seconds 3
+        
+        # Verify server started
+        $retries = 0
+        while ($retries -lt 5) {
+            try {
+                $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port" -Method Head -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
+                
+                if ($response -and $response.StatusCode -lt 400) {
+                    Write-Success "Server running at http://127.0.0.1:$port"
+                    Log-Event "server_started" @{ mode = $mode; port = $port; path = $path }
+                    return $true
+                }
+            } catch {
+                # Continue retrying
+            }
+            
+            $retries++
+            Start-Sleep -Seconds 1
+        }
+        
+        Write-ErrorMsg "Server failed to start! Check if port $port is already in use."
+        return $false
+    } catch {
+        Write-ErrorMsg "Server startup error: $_"
+        return $false
+    }
+}
+
+# ---------------------------
+# Tunnel Manager
+# ---------------------------
+function Start-NgrokTunnel($port) {
+    Write-Info "Starting Ngrok tunnel..."
+    
+    $ngrokPath = "$BIN_DIR\ngrok.exe"
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $ngrokPath
+    $psi.Arguments = "http $port"
+    $psi.CreateNoWindow = $true
+    $psi.UseShellExecute = $false
+    
+    try {
+        $process = [System.Diagnostics.Process]::Start($psi)
+        Register-Process "ngrok" $process
+        
+        Start-Sleep -Seconds 6
+        
+        # Extract URL from Ngrok API
+        $retries = 0
+        while ($retries -lt 12) {
+            try {
+                $apiResponse = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction SilentlyContinue
+                $url = $apiResponse.tunnels[0].public_url
+                
+                if ($url) {
+                    return $url.Replace("http://", "https://")
+                }
+            } catch {
+                # Continue retrying
+            }
+            
+            $retries++
+            Start-Sleep -Seconds 1
+        }
+        
+        return $null
+    } catch {
+        Write-Warn "Ngrok tunnel failed"
+        return $null
+    }
+}
+
+function Start-CloudflareTunnel($port) {
+    Write-Info "Starting Cloudflare tunnel..."
+    
+    $cfPath = "$BIN_DIR\cloudflared.exe"
+    $logPath = "$LOG_DIR\cloudflare.log"
+    
+    if (Test-Path $logPath) {
+        Remove-Item $logPath -Force
+    }
+    
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $cfPath
+    $psi.Arguments = "tunnel --url http://127.0.0.1:$port --logfile `"$logPath`""
+    $psi.CreateNoWindow = $true
+    $psi.UseShellExecute = $false
+    
+    try {
+        $process = [System.Diagnostics.Process]::Start($psi)
+        Register-Process "cloudflared" $process
+        
+        Start-Sleep -Seconds 8
+        
+        # Extract URL from log file
+        $retries = 0
+        while ($retries -lt 20) {
+            if (Test-Path $logPath) {
+                $logContent = Get-Content $logPath -Raw
+                if ($logContent -match "https://[\w-]+\.trycloudflare\.com") {
+                    return $matches[0]
+                }
+            }
+            
+            $retries++
+            Start-Sleep -Seconds 1
+        }
+        
+        return $null
+    } catch {
+        Write-Warn "Cloudflare tunnel failed"
+        return $null
+    }
+}
+
+function Start-LoclxTunnel($port) {
+    Write-Info "Starting Loclx tunnel..."
+    
+    $loclxPath = "$BIN_DIR\loclx.exe"
+    
+    if (-not (Test-Path $loclxPath)) {
+        return $null
+    }
+    
+    $logPath = "$LOG_DIR\loclx.log"
+    
+    if (Test-Path $logPath) {
+        Remove-Item $logPath -Force
+    }
+    
+    $args = "tunnel http --to :$port"
+    $loclxToken = Get-ConfigValue "loclx_token"
+    
+    if ($loclxToken) {
+        $args += " --token $loclxToken"
+    }
+    
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $loclxPath
+    $psi.Arguments = $args
+    $psi.CreateNoWindow = $true
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    
+    try {
+        $process = [System.Diagnostics.Process]::Start($psi)
+        Register-Process "loclx" $process
+        
+        Start-Sleep -Seconds 8
+        
+        # Try to read URL from output
+        $retries = 0
+        while ($retries -lt 20) {
+            $output = ""
+            if (-not $process.StandardOutput.EndOfStream) {
+                $output = $process.StandardOutput.ReadLine()
+            }
+            
+            if ($output -match "https://[\w-]+\.loclx\.io") {
+                return $matches[0]
+            }
+            
+            # Also check log file if it exists
+            if (Test-Path $logPath) {
+                $logContent = Get-Content $logPath -Raw
+                if ($logContent -match "https://[\w-]+\.loclx\.io") {
+                    return $matches[0]
+                }
+            }
+            
+            $retries++
+            Start-Sleep -Seconds 1
+        }
+        
+        return $null
+    } catch {
+        Write-Warn "Loclx tunnel failed (non-critical)"
+        return $null
+    }
+}
+
+function Start-AllTunnels($port) {
+    Write-Warn "Initializing all tunnels (this may take ~30 seconds)..."
+    
+    $results = @{}
+    
+    $results.Ngrok = Start-NgrokTunnel $port
+    $results.Cloudflare = Start-CloudflareTunnel $port
+    $results.Loclx = Start-LoclxTunnel $port
+    
+    return $results
+}
+
+# ---------------------------
+# Display Results
+# ---------------------------
+function Show-Results($urls) {
+    Write-Host ""
+    Show-Header "🌍 PUBLIC URLS READY"
+    
+    $activeCount = 0
+    $rows = @()
+    
+    foreach ($service in $urls.Keys) {
+        $url = $urls[$service]
+        if ($url) {
+            $activeCount++
+            $rows += ,@($service, $url, "$($C.BGreen)Active$($C.Reset)")
+        } else {
+            $rows += ,@($service, "N/A", "$($C.BRed)Failed$($C.Reset)")
+        }
+    }
+    
+    Show-Table @("Service", "Public URL", "Status") $rows
+    
+    if ($activeCount -eq 0) {
+        Write-ErrorMsg "All tunnels failed to start!"
+        
+        Show-Box @(
+            "Troubleshooting:",
+            "• Check your internet connection",
+            "• Verify firewall settings",
+            "• Try configuring API keys (Menu option 2)",
+            "• Check logs in: $LOG_DIR",
+            "",
+            "Server is still accessible locally at the displayed port"
+        ) $C.BYellow
+        
+        return $false
+    }
+    
+    Write-Host "$($C.BGreen)$activeCount/$($urls.Count) tunnels active$($C.Reset)"
+    
+    if ($activeCount -lt $urls.Count) {
+        Write-Host ""
+        Write-Host "$($C.Dim)TIP: Configure API keys for better reliability (Menu option 2)$($C.Reset)"
+    }
+    
+    # Quick copy suggestion
+    if ($activeCount -eq 1) {
+        $url = ($urls.Values | Where-Object { $_ })[0]
+        Write-Host ""
+        Write-Host "$($C.BCyan)Quick copy:$($C.Reset) $url"
+    }
+    
+    Write-Host ""
+    return $true
+}
+
+# ---------------------------
+# CLI Functions
+# ---------------------------
+function Get-UserDirectory {
+    while ($true) {
+        Write-Host ""
+        Write-Ask "Enter directory path to host (or '.' for current): "
+        $input = Read-Host
+        
+        if ([string]::IsNullOrWhiteSpace($input)) {
+            Write-Warn "Please enter a valid directory path!"
+            continue
+        }
+        
+        $path = [System.IO.Path]::GetFullPath($input)
+        
+        if (Test-Path $path -PathType Container) {
+            Write-Success "Selected directory: $path"
+            
+            # Show directory contents preview
+            $files = Get-ChildItem $path -File | Select-Object -First 5
+            if ($files) {
+                Write-Host ""
+                Write-Host "$($C.Dim)Preview (first 5 items):$($C.Reset)"
+                foreach ($file in $files) {
+                    Write-Host "  $($C.Dim)•$($C.Reset) $($file.Name)"
+                }
+                
+                $totalFiles = (Get-ChildItem $path).Count
+                if ($totalFiles -gt 5) {
+                    Write-Host "  $($C.Dim)... ($($totalFiles - 5) more)$($C.Reset)"
+                }
+            }
+            
+            return $path
+        } else {
+            Write-ErrorMsg "Directory '$path' does not exist!"
+            Write-Warn "Please enter a valid path (e.g., C:\mysite or .\mysite)"
+        }
+    }
+}
+
+function Get-ServerMode {
+    Write-Host ""
+    Show-Header "Select Hosting Protocol"
+    
+    Write-Host "$($C.BWhite)1)$($C.Reset) Python (http.server) $($C.Dim)- Recommended, universal$($C.Reset)"
+    Write-Host "$($C.BWhite)2)$($C.Reset) PHP (built-in server) $($C.Dim)- For PHP applications$($C.Reset)"
+    Write-Host "$($C.BWhite)3)$($C.Reset) NodeJS (http-server) $($C.Dim)- Modern, feature-rich$($C.Reset)"
+    
+    Write-Ask "Choice [1-3] (default: 1): "
+    $choice = Read-Host
+    if ($choice -eq "") { $choice = "1" }
+    
+    switch ($choice) {
+        "1" { return "Python" }
+        "2" { return "PHP" }
+        "3" { return "NodeJS" }
+        default {
+            Write-Warn "Invalid choice, using Python"
+            return "Python"
+        }
+    }
+}
+
+function Get-ServerPort {
+    $lastPort = Get-ConfigValue "last_port" $DEFAULT_PORT
+    
+    Write-Host ""
+    Write-Ask "Enter port (default: $lastPort): "
+    $port = Read-Host
+    
+    if ($port -eq "") {
+        $port = $lastPort
+    }
+    
+    $portNum = [int]$port
+    if ($portNum -le 0 -or $portNum -gt 65535) {
+        Write-Warn "Invalid port, using default $DEFAULT_PORT"
+        return $DEFAULT_PORT
+    }
+    
+    if (-not (Test-PortAvailable $portNum)) {
+        Write-ErrorMsg "Port $portNum is already in use!"
+        
+        # Find alternative
+        $altPort = Find-AvailablePort ($portNum + 1)
+        
+        if ($altPort) {
+            Write-Info "Suggested alternative port: $altPort"
+            Write-Ask "Use port $altPort? (Y/n): "
+            $choice = Read-Host
+            
+            if ($choice -ne 'n' -and $choice -ne 'N') {
+                Set-ConfigValue "last_port" $altPort
+                return $altPort
+            }
+        }
+        
+        return Get-ServerPort
+    }
+    
+    Set-ConfigValue "last_port" $portNum
+    return $portNum
+}
+
+# ---------------------------
+# About Screen
+# ---------------------------
+function Show-About {
+    Clear-Host
+    Write-Host $LOGO
+    
+    Show-Box @(
+        "Tool Name    : Local2Internet v$VERSION",
+        "Edition      : $EDITION",
+        "Description  : Professional LocalHost Exposing Tool",
+        "Author       : KasRoudra",
+        "Enhanced By  : Muhammad Taezeem Tariq Matta",
+        "Ultimate By  : Claude AI Assistant",
+        "Github       : github.com/Taezeem14/Local2Internet",
+        "License      : MIT Open Source"
+    ) $C.BPurple
+    
+    Write-Host ""
+    Write-Host "$($C.BCyan)✨ Features:$($C.Reset)"
+    
+    $features = @(
+        "Triple Tunneling (Ngrok, Cloudflare, Loclx)",
+        "API Key Support & Management",
+        "Auto-Recovery & Health Monitoring",
+        "Real-Time Statistics Tracking",
+        "Multi-Protocol Server Support",
+        "Intelligent Port Detection",
+        "Session Management",
+        "Advanced Error Handling",
+        "Modern Terminal UI"
+    )
+    
+    foreach ($feature in $features) {
+        Write-Host "  $($C.BGreen)•$($C.Reset) $feature"
+    }
+    
+    Write-Ask "`n$($C.Dim)Press ENTER to continue...$($C.Reset)"
+    Read-Host | Out-Null
+}
+
+# ---------------------------
+# Help Screen
+# ---------------------------
+function Show-Help {
+    Clear-Host
+    Write-Host $LOGO
+    Show-Header "📚 HELP & DOCUMENTATION"
+    
+    Write-Host ""
+    Write-Host "$($C.BCyan)GETTING STARTED:$($C.Reset)"
+    Write-Host "  1. Select 'Start Server & Tunnels' from main menu"
+    Write-Host "  2. Enter the directory path you want to host"
+    Write-Host "  3. Choose your preferred server protocol"
+    Write-Host "  4. Enter a port number (or use default)"
+    Write-Host "  5. Wait for tunnels to initialize"
+    Write-Host "  6. Share the public URLs with others!"
+    
+    Write-Host ""
+    Write-Host "$($C.BCyan)API KEY CONFIGURATION:$($C.Reset)"
+    Write-Host "  • Ngrok: Get authtoken from https://dashboard.ngrok.com"
+    Write-Host "  • Loclx: Get access token from https://localxpose.io/dashboard"
+    Write-Host "  $($C.Dim)Benefits: Remove rate limits, persistent URLs, priority support$($C.Reset)"
+    
+    Write-Host ""
+    Write-Host "$($C.BCyan)TROUBLESHOOTING:$($C.Reset)"
+    Write-Host "  • Port in use: Tool will suggest alternatives automatically"
+    Write-Host "  • Tunnels fail: Check internet, firewall, add API keys"
+    Write-Host "  • Server fails: Ensure directory has index.html or index.php"
+    Write-Host "  • Permission errors: Run PowerShell as Administrator"
+    
+    Write-Host ""
+    Write-Host "$($C.BCyan)LOGS & STATISTICS:$($C.Reset)"
+    Write-Host "  • Event logs: $LOG_DIR\events.log"
+    Write-Host "  • Tunnel logs: $LOG_DIR\<service>.log"
+    Write-Host "  • Statistics: Menu option 3"
+    
+    Write-Host ""
+    Write-Host "$($C.BCyan)ADVANCED FEATURES:$($C.Reset)"
+    Write-Host "  • Auto-recovery: Tunnels auto-restart on failure (coming soon)"
+    Write-Host "  • Health monitoring: Real-time tunnel status checking"
+    Write-Host "  • Session persistence: Remembers your preferences"
+    
+    Write-Ask "`n$($C.Dim)Press ENTER to continue...$($C.Reset)"
+    Read-Host | Out-Null
+}
+
+# ---------------------------
+# System Status
+# ---------------------------
+function Show-SystemStatus {
+    Clear-Host
+    Write-Host $LOGO
+    Show-Header "💻 SYSTEM STATUS"
+    
+    # Dependencies
+    Write-Host ""
+    Write-Host "$($C.BCyan)Dependencies:$($C.Reset)"
+    
+    $depsStatus = @()
+    @("python", "php", "node", "npm") | ForEach-Object {
+        $status = (Test-CommandExists $_) ? "$($C.BGreen)✓$($C.Reset)" : "$($C.BRed)✗$($C.Reset)"
+        $depsStatus += ,@($_, $status)
+    }
+    
+    Show-Table @("Package", "Status") $depsStatus
+    
+    # Tunneling tools
+    Write-Host "$($C.BCyan)Tunneling Tools:$($C.Reset)"
+    
+    $toolsStatus = @()
+    @("ngrok", "cloudflared", "loclx") | ForEach-Object {
+        $path = "$BIN_DIR\$_.exe"
+        $status = (Test-Path $path) ? "$($C.BGreen)✓ Installed$($C.Reset)" : "$($C.BRed)✗ Missing$($C.Reset)"
+        $toolsStatus += ,@($_.ToUpper(), $status)
+    }
+    
+    Show-Table @("Tool", "Status") $toolsStatus
+    
+    # System info
+    Write-Host "$($C.BCyan)System Information:$($C.Reset)"
+    Write-Host "  Platform: Windows"
+    Write-Host "  Architecture: $(Get-SystemArchitecture)"
+    Write-Host "  PowerShell: $($PSVersionTable.PSVersion)"
+    Write-Host "  Internet: $((Test-InternetConnection) ? 'Connected' : 'Disconnected')"
+    Write-Host "  Local IP: $(Get-LocalIPAddress)"
+    Write-Host ""
+}
+
+# ---------------------------
+# Main Menu
+# ---------------------------
+function Show-MainMenu {
+    $stats = [StatsTracker]::new()
+    
+    while ($true) {
+        Clear-Host
+        Write-Host $LOGO
+        Show-Header "MAIN MENU"
+        
+        Write-Host "$($C.BWhite)1)$($C.Reset) Start Server & Tunnels $($C.BGreen)[Recommended]$($C.Reset)"
+        Write-Host "$($C.BWhite)2)$($C.Reset) Manage API Keys $($C.Dim)[Configure tokens]$($C.Reset)"
+        Write-Host "$($C.BWhite)3)$($C.Reset) View Statistics $($C.Dim)[Usage data]$($C.Reset)"
+        Write-Host "$($C.BWhite)4)$($C.Reset) System Status $($C.Dim)[Check dependencies]$($C.Reset)"
+        Write-Host "$($C.BWhite)5)$($C.Reset) Help & Documentation"
+        Write-Host "$($C.BWhite)6)$($C.Reset) About"
+        Write-Host "$($C.BWhite)0)$($C.Reset) Exit"
+        
+        # Show status
+        Write-Host ""
+        Write-Host "$($C.BCyan)$('━' * 70)$($C.Reset)"
+        
+        $ngrokStatus = (Get-ConfigValue "ngrok_token") ? "$($C.BGreen)✓ Configured$($C.Reset)" : "$($C.BRed)✗ Not Set$($C.Reset)"
+        $loclxStatus = (Get-ConfigValue "loclx_token") ? "$($C.BGreen)✓ Configured$($C.Reset)" : "$($C.BRed)✗ Not Set$($C.Reset)"
+        
+        Write-Host "$($C.Dim)API Keys:$($C.Reset) Ngrok: $ngrokStatus | Loclx: $loclxStatus"
+        
+        if (Test-SessionActive) {
+            Write-Host "$($C.BYellow)⚠ Active session detected$($C.Reset)"
+        }
+        
+        $localIp = Get-LocalIPAddress
+        $internet = (Test-InternetConnection) ? "$($C.BGreen)Connected$($C.Reset)" : "$($C.BRed)No Connection$($C.Reset)"
+        Write-Host "$($C.Dim)Network:$($C.Reset) Local IP: $localIp | Internet: $internet"
+        
+        Write-Ask "`nChoice: "
+        $choice = Read-Host
+        
+        switch ($choice) {
+            "1" { Start-MainFlow $stats }
+            "2" { Manage-APIKeys }
+            "3" { $stats.DisplayStats(); Write-Ask "`n$($C.Dim)Press ENTER...$($C.Reset)"; Read-Host | Out-Null }
+            "4" { Show-SystemStatus; Write-Ask "`n$($C.Dim)Press ENTER...$($C.Reset)"; Read-Host | Out-Null }
+            "5" { Show-Help }
+            "6" { Show-About }
+            "0" {
+                Write-Host ""
+                Write-Host "$($C.BGreen)Thanks for using Local2Internet! 👋$($C.Reset)"
+                Write-Host ""
+                Stop-AllProcesses
+                exit 0
+            }
+            default {
+                Write-Warn "Invalid choice! Please select 0-6"
+                Start-Sleep -Seconds 1
+            }
+        }
+    }
+}
+
+# ---------------------------
+# Main Flow
+# ---------------------------
+function Start-MainFlow($stats) {
+    Clear-Host
+    Write-Host $LOGO
+    
+    # Pre-flight checks
+    if (-not (Test-InternetConnection)) {
+        Write-ErrorMsg "No internet connection detected!"
+        Write-Warn "Tunneling requires an active internet connection"
+        Write-Ask "`nContinue anyway? (y/N): "
+        $response = Read-Host
+        if ($response -ne 'y' -and $response -ne 'Y') {
+            return
+        }
+    }
+    
+    # Get inputs
+    $path = Get-UserDirectory
+    $mode = Get-ServerMode
+    $port = Get-ServerPort
+    
+    # Start server
+    $serverStarted = Start-LocalServer $path $port $mode
+    
+    if (-not $serverStarted) {
+        Write-ErrorMsg "Failed to start local server!"
+        Start-Sleep -Seconds 3
+        return
+    }
+    
+    # Start tunnels
+    $urls = Start-AllTunnels $port
+    
+    # Display results
+    $success = Show-Results $urls
+    
+    if (-not $success) {
+        Stop-AllProcesses
+        Start-Sleep -Seconds 5
+        return
+    }
+    
+    # Save session
+    $sessionData = @{
+        active = $true
+        pid = $PID
+        port = $port
+        mode = $mode
+        started_at = (Get-Date).ToString()
+        urls = $urls
+    }
+    Save-Session $sessionData
+    
+    # Keep alive
+    Write-Host "$($C.BCyan)$('━' * 70)$($C.Reset)"
+    Write-Host "$($C.BGreen)Server is running with health monitoring enabled$($C.Reset)"
+    Write-Host "$($C.Dim)Press CTRL+C to stop and return to menu$($C.Reset)"
+    Write-Host "$($C.BCyan)$('━' * 70)$($C.Reset)"
+    Write-Host ""
+    
+    $startTime = Get-Date
+    
+    try {
+        while ($true) {
+            Start-Sleep -Seconds 60
+            
+            # Show periodic status
+            $uptime = (Get-Date) - $startTime
+            $hours = [Math]::Floor($uptime.TotalHours)
+            $minutes = $uptime.Minutes
+            
+            Write-Host -NoNewline "`r$($C.Dim)Uptime: ${hours}h ${minutes}m | Monitoring active$($C.Reset)"
+        }
+    } catch {
+        # Handled by trap
+    } finally {
+        # Record statistics
+        $duration = [Math]::Floor(((Get-Date) - $startTime).TotalSeconds)
+        $activeTunnels = @()
+        foreach ($key in $urls.Keys) {
+            if ($urls[$key]) {
+                $activeTunnels += $key
+            }
+        }
+        
+        $stats.RecordSession($duration, $activeTunnels, $mode)
+        Clear-Session
+    }
+}
+
+# ---------------------------
+# Trap CTRL+C
+# ---------------------------
+trap {
+    Write-Host ""
+    Write-Host "$($C.BCyan)Shutting down gracefully...$($C.Reset)"
+    Stop-AllProcesses
+    Clear-Session
+    Write-Host "$($C.BGreen)Cleanup complete.$($C.Reset)"
+    Write-Host ""
+    Start-Sleep -Seconds 1
+    continue
+}
+
+# ---------------------------
+# Entry Point
+# ---------------------------
+try {
+    Stop-AllProcesses
+    Initialize-Directories
+    
+    # First run setup
+    if (-not (Get-ConfigValue "first_run_done")) {
+        Clear-Host
+        Write-Host $LOGO
+        
+        Show-Box @(
+            "Welcome to Local2Internet v$VERSION $EDITION!",
+            "",
+            "First-time setup wizard",
+            "Installing dependencies and tools..."
+        ) $C.BGreen
+        
+        Start-Sleep -Seconds 2
+        
+        $depsOk = Install-Dependencies
+        $toolsOk = Install-Tools
+        
+        if (-not $depsOk -or -not $toolsOk) {
+            Write-ErrorMsg "Setup failed! Please check errors above."
+            exit 1
+        }
+        
+        Set-ConfigValue "first_run_done" $true
+        Set-ConfigValue "installed_at" (Get-Date).ToString()
+        
+        Write-Success "Setup complete! Ready to use."
+        Start-Sleep -Seconds 2
+    } else {
+        # Quick check
+        $depsOk = Install-Dependencies
+        $toolsOk = Install-Tools
+        
+        if (-not $depsOk -or -not $toolsOk) {
+            Write-Warn "Some components may be missing"
+        }
+    }
     
     # Configure ngrok token if present
-    if config.has?('ngrok_token')
-      token = config.get('ngrok_token')
-      exec_silent("#{TOOLS[:ngrok]} config add-authtoken #{token}")
-    end
+    $ngrokToken = Get-ConfigValue "ngrok_token"
+    if ($ngrokToken) {
+        $ngrokPath = "$BIN_DIR\ngrok.exe"
+        & $ngrokPath config add-authtoken $ngrokToken 2>&1 | Out-Null
+    }
     
-    config.set('first_run_done', true)
-    config.set('installed_at', Time.now.to_s)
+    Show-MainMenu
     
-    success "Setup complete! Ready to use."
-    sleep 2
-  else
-    # Quick check
-    unless DependencyManager.check_and_install
-      error "Dependency check failed"
-      exit 1
-    end
-    
-    unless ToolDownloader.download_all
-      error "Tool download failed"
-      exit 1
-    end
-  end
-  
-  # Start main menu
-  main_menu(config, stats)
-  
-rescue StandardError => e
-  puts "\n#{BRED}[FATAL ERROR] #{e.message}#{RESET}"
-  puts "#{DIM}#{e.backtrace.first(5).join("\n")}#{RESET}" if ENV["DEBUG"]
-  ProcessManager.cleanup
-  exit 1
-end
+} catch {
+    Write-Host ""
+    Write-ErrorMsg "FATAL ERROR: $_"
+    Stop-AllProcesses
+    exit 1
+}
