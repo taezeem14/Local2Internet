@@ -10,6 +10,7 @@
 # Original Author  : KasRoudra
 # Enhanced By      : Muhammad Taezeem Tariq Matta (Bro)
 # Ultimate Edition : Claude AI (2026)
+# Fixed By         : Claude AI (February 2026)
 # Repository       : github.com/Taezeem14/Local2Internet
 # License          : MIT
 # ==========================================================
@@ -726,10 +727,16 @@ class TunnelManager
           return nil
         end
         
-        url = `grep -o "https://[a-zA-Z0-9.-]*ngrok[^ ]*" #{log_file} 2>/dev/null | head -1`.strip
+        # Look specifically for ngrok-free.app or ngrok.io URLs (actual tunnel URLs)
+        url = `grep -oE "https://[a-zA-Z0-9-]+\\.ngrok(-free)?\\.app|https://[a-zA-Z0-9-]+\\.ngrok\\.io" #{log_file} 2>/dev/null | head -1`.strip
         
-        # Make sure it's not the dashboard URL
-        if !url.empty? && !url.include?('dashboard.ngrok.com')
+        # Fallback to old pattern but exclude known bad URLs
+        if url.empty?
+          url = `grep -o "https://[a-zA-Z0-9.-]*ngrok[^ ]*" #{log_file} 2>/dev/null | grep -v "dashboard.ngrok.com" | grep -v "ngrok.com/download" | head -1`.strip
+        end
+        
+        # Return if we found a valid tunnel URL
+        if !url.empty? && !url.include?('dashboard.ngrok.com') && !url.include?('ngrok.com/download')
           return url
         end
       end
@@ -834,6 +841,30 @@ class TunnelManager
   def check_tunnel_health
     @tunnels.each do |service, url|
       next unless url
+      
+      # Skip health check for obviously invalid URLs
+      if url.include?('ngrok.com/download') || url.include?('dashboard.ngrok.com')
+        warn "#{service.to_s.capitalize} has invalid URL, attempting recovery..."
+        
+        # Attempt recovery
+        ProcessManager.kill(service)
+        sleep 2
+        
+        new_url = case service
+        when :ngrok then start_ngrok
+        when :cloudflare then start_cloudflare
+        when :loclx then start_loclx
+        end
+        
+        if new_url && !new_url.include?('ngrok.com/download')
+          @tunnels[service] = new_url
+          success "#{service.to_s.capitalize} tunnel recovered: #{new_url}"
+        else
+          error "Failed to recover #{service.to_s.capitalize} tunnel"
+        end
+        
+        next
+      end
       
       if NetworkUtils.ping_url(url)
         log_event("tunnel_health_check", { service: service, status: "healthy" })
