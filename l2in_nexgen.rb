@@ -826,7 +826,7 @@ class TunnelManager
       warn "Cloudflared binary not found"
     end
 
-    if File.exist?(TOOLS[:loclx]) || command_exists?("loclx")
+    if File.exist?(TOOLS[:loclx])
       results[:loclx] = start_loclx
     else
       warn "Loclx binary not found"
