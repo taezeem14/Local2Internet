@@ -131,65 +131,69 @@ include Colors
 
 class ThemeEngine
   attr_reader :current_theme
+
+  def self.rgb(r, g, b)
+  "\e[38;2;#{r};#{g};#{b}m"
+end
   
   THEMES = {
     cyberpunk: {
       name: "Cyberpunk",
-      primary: [rgb(236, 72, 153), rgb(139, 92, 246)],
-      accent: [rgb(34, 211, 238), rgb(59, 130, 246)],
-      success: [rgb(74, 222, 128), rgb(34, 197, 94)],
-      warning: [rgb(251, 146, 60), rgb(234, 88, 12)],
-      error: [rgb(239, 68, 68), rgb(220, 38, 38)],
-      bg: rgb(17, 24, 39),
-      text: rgb(243, 244, 246),
+      primary: [self.rgb(236, 72, 153), self.rgb(139, 92, 246)],
+      accent: [self.rgb(34, 211, 238), self.rgb(59, 130, 246)],
+      success: [self.rgb(74, 222, 128), self.rgb(34, 197, 94)],
+      warning: [self.rgb(251, 146, 60), self.rgb(234, 88, 12)],
+      error: [self.rgb(239, 68, 68), self.rgb(220, 38, 38)],
+      bg: self.rgb(17, 24, 39),
+      text: self.rgb(243, 244, 246),
       border: "▓",
       glow: true
     },
     matrix: {
       name: "Matrix",
-      primary: [rgb(74, 222, 128), rgb(34, 197, 94)],
-      accent: [rgb(134, 239, 172), rgb(74, 222, 128)],
-      success: [rgb(74, 222, 128), rgb(34, 197, 94)],
-      warning: [rgb(74, 222, 128), rgb(34, 197, 94)],
-      error: [rgb(220, 38, 38), rgb(185, 28, 28)],
-      bg: rgb(0, 0, 0),
-      text: rgb(74, 222, 128),
+      primary: [self.rgb(74, 222, 128), self.rgb(34, 197, 94)],
+      accent: [self.rgb(134, 239, 172), self.rgb(74, 222, 128)],
+      success: [self.rgb(74, 222, 128), self.rgb(34, 197, 94)],
+      warning: [self.rgb(74, 222, 128), self.rgb(34, 197, 94)],
+      error: [self.rgb(220, 38, 38), self.rgb(185, 28, 28)],
+      bg: self.rgb(0, 0, 0),
+      text: self.rgb(74, 222, 128),
       border: "█",
       glow: true
     },
     ocean: {
       name: "Ocean",
-      primary: [rgb(59, 130, 246), rgb(29, 78, 216)],
-      accent: [rgb(14, 165, 233), rgb(6, 182, 212)],
-      success: [rgb(16, 185, 129), rgb(5, 150, 105)],
-      warning: [rgb(251, 191, 36), rgb(245, 158, 11)],
-      error: [rgb(239, 68, 68), rgb(220, 38, 38)],
-      bg: rgb(15, 23, 42),
-      text: rgb(226, 232, 240),
+      primary: [self.rgb(59, 130, 246), self.rgb(29, 78, 216)],
+      accent: [self.rgb(14, 165, 233), self.rgb(6, 182, 212)],
+      success: [self.rgb(16, 185, 129), self.rgb(5, 150, 105)],
+      warning: [self.rgb(251, 191, 36), self.rgb(245, 158, 11)],
+      error: [self.rgb(239, 68, 68), self.rgb(220, 38, 38)],
+      bg: self.rgb(15, 23, 42),
+      text: self.rgb(226, 232, 240),
       border: "═",
       glow: false
     },
     sunset: {
       name: "Sunset",
-      primary: [rgb(251, 146, 60), rgb(234, 88, 12)],
-      accent: [rgb(251, 191, 36), rgb(245, 158, 11)],
-      success: [rgb(34, 197, 94), rgb(22, 163, 74)],
-      warning: [rgb(251, 146, 60), rgb(234, 88, 12)],
-      error: [rgb(239, 68, 68), rgb(220, 38, 38)],
-      bg: rgb(30, 27, 75),
-      text: rgb(254, 243, 199),
+      primary: [self.rgb(251, 146, 60), self.rgb(234, 88, 12)],
+      accent: [self.rgb(251, 191, 36), self.rgb(245, 158, 11)],
+      success: [self.rgb(34, 197, 94), self.rgb(22, 163, 74)],
+      warning: [self.rgb(251, 146, 60), self.rgb(234, 88, 12)],
+      error: [self.rgb(239, 68, 68), self.rgb(220, 38, 38)],
+      bg: self.rgb(30, 27, 75),
+      text: self.rgb(254, 243, 199),
       border: "░",
       glow: false
     },
     minimal: {
       name: "Minimal",
-      primary: [rgb(100, 116, 139), rgb(71, 85, 105)],
-      accent: [rgb(148, 163, 184), rgb(100, 116, 139)],
-      success: [rgb(34, 197, 94), rgb(22, 163, 74)],
-      warning: [rgb(251, 191, 36), rgb(245, 158, 11)],
-      error: [rgb(239, 68, 68), rgb(220, 38, 38)],
-      bg: rgb(248, 250, 252),
-      text: rgb(15, 23, 42),
+      primary: [self.rgb(100, 116, 139), self.rgb(71, 85, 105)],
+      accent: [self.rgb(148, 163, 184), self.rgb(100, 116, 139)],
+      success: [self.rgb(34, 197, 94), self.rgb(22, 163, 74)],
+      warning: [self.rgb(251, 191, 36), self.rgb(245, 158, 11)],
+      error: [self.rgb(239, 68, 68), self.rgb(220, 38, 38)],
+      bg: self.rgb(248, 250, 252),
+      text: self.rgb(15, 23, 42),
       border: "─",
       glow: false
     }
