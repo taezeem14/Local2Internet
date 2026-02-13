@@ -1,5 +1,5 @@
 # =========================================
-# Local2Internet v6 NEXT-GEN - PowerShell Edition
+# Local2Internet v5 NEXT-GEN - PowerShell Edition
 # Platform: Windows PowerShell 7.0+
 # Ultra-Modern UI with Gradients & Animations
 # Bug-Free Edition by Bro & Claude
