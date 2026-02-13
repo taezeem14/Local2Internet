@@ -436,7 +436,7 @@ We welcome contributions! Here's how to help:
 ### Submitting Pull Requests
 ```bash
 # 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/Local2Internet.git
+git clone https://github.com/Taezeem14/Local2Internet.git
 
 # 2. Create feature branch
 git checkout -b feature/amazing-feature
@@ -462,22 +462,6 @@ rake test
 # Check code quality
 rubocop l2in_ultimate.rb
 ```
-
----
-
-## 📚 Documentation
-
-### Complete Documentation
-- [Installation Guide](docs/INSTALL.md)
-- [User Manual](docs/MANUAL.md)
-- [API Reference](docs/API.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Contributing Guide](docs/CONTRIBUTING.md)
-
-### Video Tutorials
-- [Getting Started (5 min)](https://youtube.com/watch?v=...)
-- [Advanced Features (15 min)](https://youtube.com/watch?v=...)
-- [API Configuration (8 min)](https://youtube.com/watch?v=...)
 
 ---
 
