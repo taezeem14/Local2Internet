@@ -127,6 +127,10 @@ end
 include Colors
 
 # ==================== THEME ENGINE ====================
+def rgb(r, g, b)
+  "\e[38;2;#{r};#{g};#{b}m"
+end
+private :rgb
 
 class ThemeEngine
   include ColorHelpers
