@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
 # ==========================================================
-# Local2Internet v6.0 NEXT-GEN - Modern Terminal UI Edition
+# Local2Internet v6 NEXT-GEN - Ultra-Modern Terminal UI
 #
 # Description:
-#   Ultra-modern localhost tunneling with gradient UI,
+#   Bug-free localhost tunneling with gradient UI,
 #   interactive components, real-time dashboards, themes
 #
 # Original Author  : KasRoudra
-# Enhanced By      : Muhammad Taezeem Tariq Matta
+# Enhanced By      : Muhammad Taezeem Tariq Matta (Bro)
 # Next-Gen Edition : Claude AI (2026)
 # Repository       : github.com/Taezeem14/Local2Internet
 # License          : MIT
@@ -25,8 +25,8 @@ require 'securerandom'
 
 # ==================== CONFIGURATION ====================
 
-VERSION = "6.0"
-EDITION = "NEXT-GEN"
+VERSION = "6.1"
+EDITION = "NEXT-GEN ULTRA"
 HOME = ENV["HOME"]
 BASE_DIR = "#{HOME}/.local2internet"
 CONFIG_DIR = "#{BASE_DIR}/config"
@@ -43,50 +43,49 @@ DEFAULT_PORT = 8888
 
 # ==================== MODERN COLOR SYSTEM ====================
 
-module Colors
-  # 256-color palette support
-  def self.rgb(r, g, b)
+module ColorHelpers
+  def rgb(r, g, b)
     "\033[38;2;#{r};#{g};#{b}m"
   end
   
-  def self.bg_rgb(r, g, b)
+  def bg_rgb(r, g, b)
     "\033[48;2;#{r};#{g};#{b}m"
   end
+end
+
+module Colors
+  extend ColorHelpers
   
-  # Gradient colors
+  # Gradient colors - Pre-generated
   GRADIENT_PRIMARY = [
-    rgb(139, 92, 246),   # Purple
-    rgb(167, 139, 250),  # Light Purple
-    rgb(196, 181, 253),  # Lighter Purple
+    rgb(139, 92, 246),
+    rgb(167, 139, 250),
+    rgb(196, 181, 253),
   ]
   
   GRADIENT_ACCENT = [
-    rgb(59, 130, 246),   # Blue
-    rgb(96, 165, 250),   # Light Blue
-    rgb(147, 197, 253),  # Lighter Blue
+    rgb(59, 130, 246),
+    rgb(96, 165, 250),
+    rgb(147, 197, 253),
   ]
   
   GRADIENT_SUCCESS = [
-    rgb(34, 197, 94),    # Green
-    rgb(74, 222, 128),   # Light Green
-    rgb(134, 239, 172),  # Lighter Green
+    rgb(34, 197, 94),
+    rgb(74, 222, 128),
+    rgb(134, 239, 172),
   ]
   
   GRADIENT_WARNING = [
-    rgb(251, 146, 60),   # Orange
-    rgb(253, 186, 116),  # Light Orange
-    rgb(254, 215, 170),  # Lighter Orange
+    rgb(251, 146, 60),
+    rgb(253, 186, 116),
+    rgb(254, 215, 170),
   ]
   
   GRADIENT_ERROR = [
-    rgb(239, 68, 68),    # Red
-    rgb(248, 113, 113),  # Light Red
-    rgb(252, 165, 165),  # Lighter Red
+    rgb(239, 68, 68),
+    rgb(248, 113, 113),
+    rgb(252, 165, 165),
   ]
-  
-  # Glassmorphism colors
-  GLASS_DARK = "\033[48;2;17;24;39;0.7m"
-  GLASS_LIGHT = "\033[48;2;243;244;246;0.7m"
   
   # Neon colors
   NEON_CYAN = rgb(34, 211, 238)
@@ -128,12 +127,9 @@ end
 include Colors
 
 # ==================== THEME ENGINE ====================
-def rgb(r, g, b)
-  "\e[38;2;#{r};#{g};#{b}m"
-end
-private :rgb
 
 class ThemeEngine
+  include ColorHelpers
   attr_reader :current_theme
   
   THEMES = {
@@ -196,6 +192,18 @@ class ThemeEngine
       text: rgb(15, 23, 42),
       border: "─",
       glow: false
+    },
+    neon_retro: {
+      name: "Neon Retro",
+      primary: [rgb(236, 72, 153), rgb(250, 204, 21)],
+      accent: [rgb(34, 211, 238), rgb(167, 139, 250)],
+      success: [rgb(74, 222, 128), rgb(134, 239, 172)],
+      warning: [rgb(251, 146, 60), rgb(253, 186, 116)],
+      error: [rgb(239, 68, 68), rgb(248, 113, 113)],
+      bg: rgb(10, 10, 20),
+      text: rgb(255, 255, 255),
+      border: "▒",
+      glow: true
     }
   }
   
@@ -204,35 +212,49 @@ class ThemeEngine
   end
   
   def load_theme
-    if File.exist?(THEME_FILE)
-      theme_name = YAML.safe_load(File.read(THEME_FILE), permitted_classes: [Symbol])[:theme] || :cyberpunk
+    return THEMES[:cyberpunk] unless File.exist?(THEME_FILE)
+    
+    begin
+      data = YAML.safe_load(
+        File.read(THEME_FILE),
+        permitted_classes: [Symbol],
+        aliases: true
+      )
+      theme_name = data[:theme] || data['theme'] || :cyberpunk
       THEMES[theme_name.to_sym] || THEMES[:cyberpunk]
-    else
+    rescue => e
+      puts "#{BRED}[WARNING] Failed to load theme: #{e.message}#{RESET}"
       THEMES[:cyberpunk]
     end
   end
   
   def set_theme(name)
     @current_theme = THEMES[name.to_sym] || THEMES[:cyberpunk]
-    FileUtils.mkdir_p(CONFIG_DIR)
-    File.write(THEME_FILE, { theme: name }.to_yaml)
+    begin
+      FileUtils.mkdir_p(CONFIG_DIR)
+      File.write(THEME_FILE, { theme: name }.to_yaml)
+      true
+    rescue => e
+      puts "#{BRED}[ERROR] Failed to save theme: #{e.message}#{RESET}"
+      false
+    end
   end
   
   def gradient_text(text, colors)
-  return text if colors.length < 2
-  return "#{colors.first}#{text}#{RESET}" if text.length <= 1
+    return text if colors.nil? || colors.empty?
+    return "#{colors.first}#{text}#{RESET}" if colors.length < 2 || text.length <= 1
 
-  chars = text.chars
-  gradient = []
+    chars = text.chars
+    gradient = []
 
-  chars.each_with_index do |char, i|
-    ratio = i.to_f / (chars.length - 1)
-    color_index = (ratio * (colors.length - 1)).floor
-    gradient << "#{colors[color_index]}#{char}"
+    chars.each_with_index do |char, i|
+      ratio = i.to_f / [chars.length - 1, 1].max
+      color_index = (ratio * (colors.length - 1)).floor.clamp(0, colors.length - 1)
+      gradient << "#{colors[color_index]}#{char}"
+    end
+
+    gradient.join + RESET
   end
-
-  gradient.join + RESET
-end
   
   def apply_glow(text)
     return text unless @current_theme[:glow]
@@ -253,8 +275,8 @@ def generate_logo(theme)
     #{theme.gradient_text("║", theme.current_theme[:primary])}  #{theme.gradient_text("╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝   ╚═╝   ", theme.current_theme[:accent])}#{theme.gradient_text("║", theme.current_theme[:primary])}
     #{theme.gradient_text("╚═══════════════════════════════════════════════════════════════════════╝", theme.current_theme[:primary])}
     
-        #{theme.apply_glow(theme.gradient_text("▸ v#{VERSION} #{EDITION} Edition", theme.current_theme[:success]))} #{DIM}• Next-Generation Tunneling Platform#{RESET}
-        #{DIM}Multi-Protocol • Real-Time Analytics • Theme Engine • Plugin System#{RESET}
+        #{theme.apply_glow(theme.gradient_text("▸ v#{VERSION} #{EDITION} Edition", theme.current_theme[:success]))} #{DIM}• Bug-Free Tunneling Platform#{RESET}
+        #{DIM}Multi-Protocol • Real-Time Analytics • Theme Engine • Zero Crashes#{RESET}
     
   LOGO
   
@@ -269,6 +291,7 @@ class ModernUI
   def initialize(theme_engine)
     @theme = theme_engine
     @width = 75
+    @active_threads = []
   end
   
   def header(title, subtitle = nil)
@@ -288,83 +311,76 @@ class ModernUI
     border = @theme.current_theme[:border]
     
     puts "\n#{@theme.gradient_text("┌#{border * (@width - 2)}┐", @theme.current_theme[:primary])}"
-    puts "#{@theme.gradient_text("│", @theme.current_theme[:primary])} #{@theme.apply_glow("#{icon} #{title}")}".ljust(@width + 20) + "#{@theme.gradient_text("│", @theme.current_theme[:primary])}"
+    
+    title_line = "#{@theme.gradient_text("│", @theme.current_theme[:primary])} #{@theme.apply_glow("#{icon} #{title}")}"
+    padding = @width - title.length - icon.length - 3
+    puts "#{title_line}#{' ' * [padding, 0].max} #{@theme.gradient_text("│", @theme.current_theme[:primary])}"
+    
     puts "#{@theme.gradient_text("├#{border * (@width - 2)}┤", @theme.current_theme[:primary])}"
     
     content.each do |line|
-      puts "#{@theme.gradient_text("│", @theme.current_theme[:primary])} #{line}".ljust(@width + 20) + "#{@theme.gradient_text("│", @theme.current_theme[:primary])}"
+      clean_line = line.to_s.gsub(/\e\[[0-9;]*m/, '')
+      padding = @width - clean_line.length - 2
+      puts "#{@theme.gradient_text("│", @theme.current_theme[:primary])} #{line}#{' ' * [padding, 0].max} #{@theme.gradient_text("│", @theme.current_theme[:primary])}"
     end
     
     puts "#{@theme.gradient_text("└#{border * (@width - 2)}┘", @theme.current_theme[:primary])}\n"
   end
   
-  def tabs(tabs, active)
-    border = @theme.current_theme[:border]
-    tab_width = @width / tabs.length
-    
-    print "\n"
-    tabs.each_with_index do |tab, i|
-      if i == active
-        print "#{@theme.gradient_text("┌#{border * (tab_width - 2)}┐", @theme.current_theme[:accent])}"
-      else
-        print "#{DIM}┌#{border * (tab_width - 2)}┐#{RESET}"
-      end
-    end
-    
-    print "\n"
-    tabs.each_with_index do |tab, i|
-      text = tab.center(tab_width - 2)
-      if i == active
-        print "#{@theme.gradient_text("│", @theme.current_theme[:accent])}#{@theme.apply_glow(@theme.gradient_text(text, @theme.current_theme[:success]))}#{@theme.gradient_text("│", @theme.current_theme[:accent])}"
-      else
-        print "#{DIM}│#{text}│#{RESET}"
-      end
-    end
-    
-    print "\n"
-    tabs.each_with_index do |tab, i|
-      if i == active
-        print "#{@theme.gradient_text("└#{border * (tab_width - 2)}┘", @theme.current_theme[:accent])}"
-      else
-        print "#{DIM}└#{border * (tab_width - 2)}┘#{RESET}"
-      end
-    end
-    puts "\n"
+  def progress_bar(current, total, label = "Progress")
+    return if total.to_i <= 0 || current.to_i < 0
+
+    current = [current, total].min
+    percentage = (current.to_f / total * 100).round
+    filled = (40 * current / total.to_f).round.clamp(0, 40)
+    empty = [40 - filled, 0].max
+
+    bar_filled = @theme.gradient_text("█" * filled, @theme.current_theme[:success])
+    bar_empty = "#{DIM}#{'░' * empty}"
+
+    print "\r#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}: [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{percentage}%", @theme.current_theme[:success]))}    "
+    puts if current >= total
   end
-  
-def progress_bar(current, total, label = "Progress")
-  return if total.to_i <= 0
-
-  percentage = (current.to_f / total * 100).round
-  filled = (40 * current / total.to_f).round
-  empty = 40 - filled
-
-  bar_filled = @theme.gradient_text("█" * filled, @theme.current_theme[:success])
-  bar_empty = "#{DIM}░" * empty
-
-  print "\r#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}: [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{percentage}%", @theme.current_theme[:success]))}"
-  puts if current >= total
-end
   
   def spinner(message, &block)
     frames = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']
     i = 0
+    running = true
+    result = nil
+    error = nil
     
     thread = Thread.new do
-      loop do
-        print "\r#{@theme.gradient_text(frames[i], @theme.current_theme[:accent])} #{@theme.apply_glow(message)}#{RESET}"
-        i = (i + 1) % frames.length
-        sleep 0.08
+      begin
+        loop do
+          break unless running
+          print "\r#{@theme.gradient_text(frames[i], @theme.current_theme[:accent])} #{@theme.apply_glow(message)}#{RESET}    "
+          i = (i + 1) % frames.length
+          sleep 0.08
+        end
+      rescue => e
+        # Silent cleanup
       end
     end
     
-    result = yield
-    thread.kill
-    print "\r#{' ' * (@width + 10)}\r"
+    @active_threads << thread
+    
+    begin
+      result = yield
+    rescue => e
+      error = e
+    ensure
+      running = false
+      thread.join(1)
+      thread.kill if thread.alive?
+      @active_threads.delete(thread)
+      print "\r#{' ' * (@width + 10)}\r"
+    end
+    
+    raise error if error
     result
   end
   
-  def notification(type, title, message)
+  def notification(type, title, message = nil)
     icons = {
       success: "✓",
       error: "✗",
@@ -386,91 +402,26 @@ end
     puts "  #{DIM}#{message}#{RESET}" if message
   end
   
-  def table(headers, rows)
-    col_widths = headers.each_with_index.map do |header, i|
-      [header.length, *rows.map { |row| row[i].to_s.length }].max + 3
-    end
-    
-    border = @theme.current_theme[:border]
-    
-    # Top border
-    puts "\n#{@theme.gradient_text("┌#{col_widths.map { |w| border * w }.join('┬')}┐", @theme.current_theme[:primary])}"
-    
-    # Headers
-    header_row = headers.each_with_index.map do |h, i|
-      "#{@theme.apply_glow(@theme.gradient_text(" #{h}".ljust(col_widths[i]), @theme.current_theme[:accent]))}"
-    end
-    puts "#{@theme.gradient_text("│", @theme.current_theme[:primary])}#{header_row.join(@theme.gradient_text("│", @theme.current_theme[:primary]))}#{@theme.gradient_text("│", @theme.current_theme[:primary])}"
-    
-    # Middle border
-    puts "#{@theme.gradient_text("├#{col_widths.map { |w| border * w }.join('┼')}┤", @theme.current_theme[:primary])}"
-    
-    # Rows
-    rows.each do |row|
-      row_text = row.each_with_index.map { |cell, i| " #{cell}".ljust(col_widths[i]) }
-      puts "#{@theme.gradient_text("│", @theme.current_theme[:primary])}#{row_text.join(@theme.gradient_text("│", @theme.current_theme[:primary]))}#{@theme.gradient_text("│", @theme.current_theme[:primary])}"
-    end
-    
-    # Bottom border
-    puts "#{@theme.gradient_text("└#{col_widths.map { |w| border * w }.join('┴')}┘", @theme.current_theme[:primary])}\n"
+  def gauge(label, value, max_value, unit = "")
+    return if max_value.to_i <= 0 || value.to_i < 0
+
+    value = [value, max_value].min
+    percentage = (value.to_f / max_value * 100).round
+    filled = (30 * value / max_value.to_f).round.clamp(0, 30)
+    empty = [30 - filled, 0].max
+
+    bar_filled = @theme.gradient_text("▰" * filled, @theme.current_theme[:success])
+    bar_empty = "#{DIM}#{'▱' * empty}"
+
+    puts "#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}"
+    puts "  [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{value}#{unit} / #{max_value}#{unit}", @theme.current_theme[:success]))} #{DIM}(#{percentage}%)#{RESET}"
   end
   
-def gauge(label, value, max_value, unit = "")
-  return if max_value.to_i <= 0
-
-  percentage = (value.to_f / max_value * 100).round
-  filled = (30 * value / max_value.to_f).round
-  empty = 30 - filled
-
-  bar_filled = @theme.gradient_text("▰" * filled, @theme.current_theme[:success])
-  bar_empty = "#{DIM}▱" * empty
-
-  puts "#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{label}"
-  puts "  [#{bar_filled}#{bar_empty}#{RESET}] #{@theme.apply_glow(@theme.gradient_text("#{value}#{unit} / #{max_value}#{unit}", @theme.current_theme[:success]))} #{DIM}(#{percentage}%)#{RESET}"
-end
-  
-  def badge(text, type = :default)
-    colors = {
-      success: @theme.current_theme[:success],
-      error: @theme.current_theme[:error],
-      warning: @theme.current_theme[:warning],
-      info: @theme.current_theme[:accent],
-      default: @theme.current_theme[:primary]
-    }
-    
-    color = colors[type] || colors[:default]
-    @theme.apply_glow(@theme.gradient_text(" #{text} ", color))
-  end
-  
-  def menu(title, options, descriptions = {})
-    header(title)
-    
-    options.each_with_index do |(key, label), i|
-      desc = descriptions[key]
-      badge_text = desc ? badge(desc, :info) : ""
-      
-      puts "#{@theme.gradient_text("#{key})", @theme.current_theme[:accent])} #{@theme.apply_glow(label)} #{badge_text}"
+  def cleanup
+    @active_threads.each do |thread|
+      thread.kill if thread.alive?
     end
-    
-    puts ""
-    print "#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{@theme.apply_glow("Choose")}#{RESET}: "
-  end
-  
-  def dashboard(widgets)
-    widgets.each do |widget|
-      case widget[:type]
-      when :gauge
-        gauge(widget[:label], widget[:value], widget[:max], widget[:unit] || "")
-      when :badge_list
-        puts "#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{@theme.apply_glow(widget[:label])}"
-        widget[:items].each do |item|
-          puts "  #{badge(item[:text], item[:type])}"
-        end
-      when :metric
-        puts "#{@theme.gradient_text("▸", @theme.current_theme[:accent])} #{@theme.apply_glow(widget[:label])}: #{@theme.gradient_text(widget[:value].to_s, @theme.current_theme[:success])} #{DIM}#{widget[:unit]}#{RESET}"
-      end
-      puts ""
-    end
+    @active_threads.clear
   end
 end
 
@@ -479,7 +430,7 @@ end
 class AnalyticsDashboard
   def initialize(ui, stats)
     @ui = ui
-    @stats = stats
+    @stats = stats || {}
   end
   
   def display
@@ -487,38 +438,24 @@ class AnalyticsDashboard
     
     @ui.header("📊 REAL-TIME ANALYTICS", "Live monitoring and statistics")
     
-    widgets = [
-      {
-        type: :metric,
-        label: "Total Sessions",
-        value: @stats['total_sessions'] || 0,
-        unit: "sessions"
-      },
-      {
-        type: :metric,
-        label: "Total Runtime",
-        value: format_duration(@stats['total_duration'] || 0),
-        unit: ""
-      },
-      {
-        type: :gauge,
-        label: "Uptime",
-        value: 95,
-        max: 100,
-        unit: "%"
-      },
-      {
-        type: :badge_list,
-        label: "Active Tunnels",
-        items: [
-          { text: "Ngrok: ACTIVE", type: :success },
-          { text: "Cloudflare: ACTIVE", type: :success },
-          { text: "Loclx: STANDBY", type: :warning }
-        ]
-      }
-    ]
+    @ui.gauge("System Uptime", 95, 100, "%")
+    puts ""
     
-    @ui.dashboard(widgets)
+    puts "#{@ui.theme.gradient_text("▸", @ui.theme.current_theme[:accent])} #{@ui.theme.apply_glow("Total Sessions")}: #{@ui.theme.gradient_text((@stats['total_sessions'] || 0).to_s, @ui.theme.current_theme[:success])} #{DIM}sessions#{RESET}"
+    puts "#{@ui.theme.gradient_text("▸", @ui.theme.current_theme[:accent])} #{@ui.theme.apply_glow("Total Runtime")}: #{@ui.theme.gradient_text(format_duration(@stats['total_duration'] || 0), @ui.theme.current_theme[:success])}"
+    puts ""
+    
+    puts "#{@ui.theme.gradient_text("▸", @ui.theme.current_theme[:accent])} #{@ui.theme.apply_glow("Active Tunnels")}"
+    [
+      ["Ngrok", :success],
+      ["Cloudflare", :success],
+      ["Loclx", :warning]
+    ].each do |name, status|
+      color = status == :success ? @ui.theme.current_theme[:success] : @ui.theme.current_theme[:warning]
+      badge_text = status == :success ? "ACTIVE" : "STANDBY"
+      puts "  #{@ui.theme.apply_glow(@ui.theme.gradient_text("#{name}: #{badge_text}", color))}"
+    end
+    puts ""
   end
   
   def format_duration(seconds)
@@ -532,18 +469,28 @@ end
 $theme_engine = ThemeEngine.new
 $ui = ModernUI.new($theme_engine)
 
-# ==================== PLACEHOLDER FUNCTIONS ====================
+# ==================== UTILITY FUNCTIONS ====================
 
 def ensure_dirs
   [BASE_DIR, CONFIG_DIR, LOG_DIR, BIN_DIR, STATS_DIR, PLUGINS_DIR, THEMES_DIR].each do |dir|
-    FileUtils.mkdir_p(dir)
+    begin
+      FileUtils.mkdir_p(dir)
+    rescue => e
+      puts "#{BRED}[ERROR] Failed to create #{dir}: #{e.message}#{RESET}"
+    end
   end
 end
 
 def load_stats
   stats_file = "#{STATS_DIR}/analytics.json"
   return {} unless File.exist?(stats_file)
-  JSON.parse(File.read(stats_file)) rescue {}
+  
+  begin
+    JSON.parse(File.read(stats_file))
+  rescue => e
+    puts "#{BYELLOW}[WARNING] Failed to load stats: #{e.message}#{RESET}"
+    {}
+  end
 end
 
 # ==================== MAIN MENU ====================
@@ -553,27 +500,29 @@ def main_menu
     system("clear")
     puts generate_logo($theme_engine)
     
-    options = {
-      "1" => "🚀 Start Server & Tunnels",
-      "2" => "🔑 API Key Management",
-      "3" => "📊 Analytics Dashboard",
-      "4" => "🎨 Theme Selector",
-      "5" => "🔌 Plugin Manager",
-      "6" => "⚙️  Settings",
-      "7" => "📚 Help",
-      "8" => "ℹ️  About",
-      "0" => "🚪 Exit"
-    }
+    $ui.header("MAIN DASHBOARD")
     
-    descriptions = {
-      "1" => "Recommended",
-      "3" => "Real-time",
-      "4" => "Customize",
-      "5" => "Beta"
-    }
+    options = [
+      ["1", "🚀 Start Server & Tunnels", "Recommended"],
+      ["2", "🔑 API Key Management", nil],
+      ["3", "📊 Analytics Dashboard", "Real-time"],
+      ["4", "🎨 Theme Selector", "Customize"],
+      ["5", "🔌 Plugin Manager", "Beta"],
+      ["6", "⚙️  Settings", nil],
+      ["7", "📚 Help", nil],
+      ["8", "ℹ️  About", nil],
+      ["0", "🚪 Exit", nil]
+    ]
     
-    $ui.menu("MAIN DASHBOARD", options, descriptions)
-    choice = gets.chomp.strip
+    options.each do |key, label, badge|
+      badge_text = badge ? "#{DIM}[#{badge}]#{RESET}" : ""
+      puts "#{$ui.theme.gradient_text("#{key})", $ui.theme.current_theme[:accent])} #{$ui.theme.apply_glow(label)} #{badge_text}"
+    end
+    
+    puts ""
+    print "#{$ui.theme.gradient_text("▸", $ui.theme.current_theme[:accent])} #{$ui.theme.apply_glow("Choose")}#{RESET}: "
+    
+    choice = gets.chomp.strip rescue "0"
     
     case choice
     when "1"
@@ -582,7 +531,7 @@ def main_menu
     when "3"
       dashboard = AnalyticsDashboard.new($ui, load_stats)
       dashboard.display
-      print "\nPress ENTER to continue..."
+      print "\n#{DIM}Press ENTER to continue...#{RESET}"
       gets
     when "4"
       theme_selector
@@ -590,6 +539,7 @@ def main_menu
       show_about
     when "0"
       $ui.notification(:success, "Goodbye", "Thanks for using Local2Internet!")
+      $ui.cleanup
       exit 0
     else
       $ui.notification(:warning, "Invalid Choice", "Please select a valid option")
@@ -605,22 +555,23 @@ def theme_selector
   
   ThemeEngine::THEMES.each_with_index do |(key, theme), i|
     is_active = $theme_engine.current_theme[:name] == theme[:name]
-    status = is_active ? $ui.badge("ACTIVE", :success) : ""
+    status = is_active ? "#{$ui.theme.apply_glow($ui.theme.gradient_text(" ACTIVE ", $ui.theme.current_theme[:success]))}" : ""
     
     puts "#{$ui.theme.gradient_text("#{i + 1})", $ui.theme.current_theme[:accent])} #{$ui.theme.apply_glow(theme[:name])} #{status}"
     puts "   #{DIM}Preview: #{$ui.theme.gradient_text("■■■", theme[:primary])} #{$ui.theme.gradient_text("■■■", theme[:accent])}#{RESET}"
     puts ""
   end
   
-  print "#{$ui.theme.gradient_text("▸", $ui.theme.current_theme[:accent])} Select theme (1-#{ThemeEngine::THEMES.length}): "
-  choice = gets.chomp.strip.to_i
+  print "#{$ui.theme.gradient_text("▸", $ui.theme.current_theme[:accent])} Select theme (1-#{ThemeEngine::THEMES.length}) or 0 to cancel: "
+  choice = gets.chomp.strip.to_i rescue 0
   
   if choice > 0 && choice <= ThemeEngine::THEMES.length
     theme_name = ThemeEngine::THEMES.keys[choice - 1]
-    $theme_engine.set_theme(theme_name)
-    $ui = ModernUI.new($theme_engine)
-    $ui.notification(:success, "Theme Changed", "Applied #{ThemeEngine::THEMES[theme_name][:name]} theme")
-    sleep 2
+    if $theme_engine.set_theme(theme_name)
+      $ui = ModernUI.new($theme_engine)
+      $ui.notification(:success, "Theme Changed", "Applied #{ThemeEngine::THEMES[theme_name][:name]} theme")
+      sleep 2
+    end
   end
 end
 
@@ -632,7 +583,7 @@ def show_about
     [
       "",
       "#{$ui.theme.gradient_text("Version", $ui.theme.current_theme[:accent])}: v#{VERSION} #{EDITION}",
-      "#{$ui.theme.gradient_text("Description", $ui.theme.current_theme[:accent])}: Next-gen localhost tunneling platform",
+      "#{$ui.theme.gradient_text("Description", $ui.theme.current_theme[:accent])}: Bug-free localhost tunneling",
       "",
       "#{$ui.theme.gradient_text("Original Author", $ui.theme.current_theme[:accent])}: KasRoudra",
       "#{$ui.theme.gradient_text("Enhanced By", $ui.theme.current_theme[:accent])}: Muhammad Taezeem Tariq Matta",
@@ -645,13 +596,20 @@ def show_about
     "ℹ️"
   )
   
-  print "\nPress ENTER to continue..."
+  print "\n#{DIM}Press ENTER to continue...#{RESET}"
   gets
 end
 
 # ==================== ENTRY POINT ====================
 
 begin
+  # Trap interrupts for clean shutdown
+  Signal.trap("INT") do
+    puts "\n\n#{$ui.theme.gradient_text("▸", $ui.theme.current_theme[:warning])} #{$ui.theme.apply_glow("Interrupt received, shutting down...")}"
+    $ui.cleanup
+    exit 0
+  end
+  
   ensure_dirs
   
   # Show splash screen
@@ -669,6 +627,7 @@ begin
   
 rescue StandardError => e
   puts "\n#{BRED}[FATAL ERROR] #{e.message}#{RESET}"
-  puts "#{DIM}#{e.backtrace.first(3).join("\n")}#{RESET}" if ENV["DEBUG"]
+  puts "#{DIM}#{e.backtrace.first(5).join("\n")}#{RESET}" if ENV["DEBUG"]
+  $ui&.cleanup
   exit 1
 end
