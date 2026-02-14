@@ -133,12 +133,12 @@ Use port 8889? (Y/n): _
 
 #### Linux / Termux
 ```bash
-curl -sL https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install_ultimate.sh | bash
+curl -sL https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install_nexgen.sh | bash
 ```
 
 #### Windows PowerShell
 ```powershell
-iwr -useb https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install_ultimate.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/Taezeem14/Local2Internet/main/install_nexgen.ps1 | iex
 ```
 
 ### Manual Installation
